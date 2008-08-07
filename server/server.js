@@ -46,6 +46,11 @@ SC.Server = SC.Object.extend({
   // Set this string to true when escaping the JSON string is necessary
   escapeJSON: true,
   
+  // Handlers you can initialize when creating this server. If set, they will
+  // be called after each request.
+  onSuccess: null,
+  onFailure: null,
+  
   // call this in your main to preload any data sent from the server with the
   // initial page load.
   preload: function(clientData) {
@@ -69,8 +74,10 @@ SC.Server = SC.Object.extend({
     // Get Settings and Options
     if (!params) params = {} ;
     var opts = {} ;
-    var onSuccess = params.onSuccess; delete params.onSuccess;
-    var onNotModified = params.onNotModified; delete params.onNotModified ;
+    var _onSuccess = params._onSuccess; delete params._onSuccess ;
+    var _onNotModified = params._onNotModified; delete params._onNotModified ;
+    var _onFailure = params._onFailure ; delete params._onFailure ;
+    var onSuccess = params.onSuccess ; delete params.onSuccess ;
     var onFailure = params.onFailure ; delete params.onFailure ;
     var context = params.requestContext ; delete params.requestContext ;
     var accept = params.accept ; delete params.accept ;
@@ -101,17 +108,23 @@ SC.Server = SC.Object.extend({
     // Save callback functions.
     opts.onSuccess = function(transport) {
       var cacheCode = request.getHeader('Last-Modified') ;
-      if ((transport.status == '200') && (transport.responseText == '304 Not Modified')) {
-        if (onNotModified) onNotModified(transport.status, transport, cacheCode,context);
+      var bubble = true;
+      if (onSuccess) bubble = (false != onSuccess(transport.status, transport, cacheCode, context));
+      if (bubble && server.onSuccess) bubble = (false != server.onSuccess(transport.status, transport, cacheCode, context));
+      if (bubble) if ((transport.status == '200') && (transport.responseText == '304 Not Modified')) {
+        if (_onNotModified) _onNotModified(transport.status, transport, cacheCode, context);
       } else {
-        if (onSuccess) onSuccess(transport.status, transport, cacheCode,context);
+        if (_onSuccess) _onSuccess(transport.status, transport, cacheCode, context);
       }
     } ;
-    
+
     opts.onFailure = function(transport) {
       var cacheCode = request.getHeader('Last-Modified') ;
-      if (onFailure) onFailure(transport.status, transport, cacheCode,context);
-    } ; 
+      var bubble = true;
+      if (onFailure) bubble = (false != onFailure(transport.status, transport, cacheCode, context));
+      if (bubble && server.onFailure) bubble = (false != server.onFailure(transport.status, transport, cacheCode, context));
+      if (bubble && _onFailure) _onFailure(transport.status, transport, cacheCode, context);
+    } ;
     
     console.log('REQUEST: %@ %@'.fmt(opts.method, url)) ;
     
@@ -164,9 +177,11 @@ SC.Server = SC.Object.extend({
     }
     
     params.requestContext = opts ;
-    params.onSuccess = this._listSuccess.bind(this) ;
-    params.onNotModified = this._listNotModified.bind(this) ;
-    params.onFailure = this._listFailure.bind(this) ;
+    params._onSuccess = this._listSuccess.bind(this) ;
+    params._onNotModified = this._listNotModified.bind(this) ;
+    params._onFailure = this._listFailure.bind(this) ;
+    params.onSuccess = opts.onSuccess ;
+    params.onFailure = opts.onFailure ;
     if (opts.cacheCode) params.cacheCode = opts.cacheCode ;
     if (opts.offset) params.offset = opts.offset;
     if (opts.limit) params.limit = opts.limit ;
@@ -230,8 +245,8 @@ SC.Server = SC.Object.extend({
       // issue request
       this.request(resource, this._createAction, null, {
         requestContext: context, 
-        onSuccess: this._createSuccess.bind(this),
-        onFailure: this._createFailure.bind(this),
+        _onSuccess: this._createSuccess.bind(this),
+        _onFailure: this._createFailure.bind(this),
         records: data
       }, this._createMethod) ;
     }
@@ -293,8 +308,8 @@ SC.Server = SC.Object.extend({
       params = {
         requestContext: context, 
         cacheCode: ((cacheCode=='') ? null : cacheCode),
-        onSuccess: this._refreshSuccess.bind(this),
-        onFailure: this._refreshFailure.bind(this)
+        _onSuccess: this._refreshSuccess.bind(this),
+        _onFailure: this._refreshFailure.bind(this)
       };
       
       if (ids.length == 1 && curRecords[0].refreshURL) params['url'] = curRecords[0].refreshURL;
@@ -372,8 +387,8 @@ SC.Server = SC.Object.extend({
 
         params = {
           requestContext: records,
-          onSuccess: this._commitSuccess.bind(this),
-          onFailure: this._commitFailure.bind(this),
+          _onSuccess: this._commitSuccess.bind(this),
+          _onFailure: this._commitFailure.bind(this),
           records: data
         };
 
@@ -435,8 +450,8 @@ SC.Server = SC.Object.extend({
       if (ids && ids.length > 0) {
         params = {
           requestContext: records,
-          onSuccess: this._destroySuccess.bind(this),
-          onFailure: this._destroyFailure.bind(this)
+          _onSuccess: this._destroySuccess.bind(this),
+          _onFailure: this._destroyFailure.bind(this)
         };
 
         if (ids.length == 1 && curRecords[0].destroyURL) params['url'] = curRecords[0].destroyURL;
