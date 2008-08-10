@@ -77,7 +77,9 @@ SC.Server = SC.Object.extend({
     var cacheCode = params.cacheCode; delete params.cacheCode ;
     var url = params.url; delete params.url;
 
-    opts.requestHeaders = {'Accept': 'application/json, text/javascript, application/xml, text/xml, text/html, */*'}
+    opts.requestHeaders = {}
+    opts.requestHeaders['X-SproutCore-Version'] = '1.0'
+    opts.requestHeaders['Accept'] = 'application/sproutcore, application/json, */*'
     if (accept) opts.requestHeaders['Accept'] = accept ;
     if (cacheCode) opts.requestHeaders['Sproutit-Cache'] = cacheCode ;
     opts.method = method || 'get' ;
@@ -89,9 +91,6 @@ SC.Server = SC.Object.extend({
       params.ids = [ids].flatten().join(',') ;
     }    
     
-    // adds a custom HTTP header for remote requests
-    opts.requestHeaders = {'X-SproutCore-Version' : '1.0'}
-
     // convert parameters.
     var parameters = this._toQueryString(params) ;
     if (parameters && parameters.length > 0) opts.parameters = parameters ;
