@@ -89,11 +89,19 @@ SC.Server = SC.Object.extend({
     // handle ids
     if (ids && ids.length > 1) {
       params.ids = [ids].flatten().join(',') ;
-    }    
+    }
     
     // convert parameters.
     var parameters = this._toQueryString(params) ;
-    if (parameters && parameters.length > 0) opts.parameters = parameters ;
+    if (parameters && parameters.length > 0) {
+      if (opts.method == 'delete') {
+        // HTTP DELETE doesn't allow a post body; this should actually
+        // be handled by prototype..
+        url = url + (url.match(/\?/) ? "&" : "?") + parameters;
+      } else {
+        opts.parameters = parameters;
+      }
+    }
     
     var request = null ; //will container the ajax request
     
