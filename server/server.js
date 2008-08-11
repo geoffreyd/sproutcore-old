@@ -77,9 +77,9 @@ SC.Server = SC.Object.extend({
     var cacheCode = params.cacheCode; delete params.cacheCode ;
     var url = params.url; delete params.url;
 
-    opts.requestHeaders = {}
-    opts.requestHeaders['X-SproutCore-Version'] = '1.0'
-    opts.requestHeaders['Accept'] = 'application/sproutcore, application/json, */*'
+    opts.requestHeaders = {} ;
+    opts.requestHeaders['X-SproutCore-Version'] = SC.VERSION ;
+    opts.requestHeaders['Accept'] = 'application/sproutcore, application/json, */*' ;
     if (accept) opts.requestHeaders['Accept'] = accept ;
     if (cacheCode) opts.requestHeaders['Sproutit-Cache'] = cacheCode ;
     opts.method = method || 'get' ;
