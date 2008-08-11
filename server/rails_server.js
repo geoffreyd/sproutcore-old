@@ -71,12 +71,14 @@ require('core') ;
 */
 SC.RailsServer = SC.RestServer.extend({
 
-  urlFor: function(resource, action, ids, params, method) {
-    if (method != 'get' && SC.RAILS_AUTH_TOKEN_NAME) {
+  request: function(resource, action, ids, params, method) {
+    params.emulateUncommonMethods = true;
+
+    if (['post', 'put', 'delete'].include(method) && SC.RAILS_AUTH_TOKEN_NAME) {
       params[SC.RAILS_AUTH_TOKEN_NAME] = SC.RAILS_AUTH_TOKEN;
     }
 
-    return sc_super();
+    sc_super();
   }
 
 }) ;

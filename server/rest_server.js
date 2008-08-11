@@ -65,7 +65,7 @@ require('server') ;
       for many records    DELETE /sc/contacts?ids=1,2,3,4,5
 
   The above is the default behaviour of this server. If you want different 
-  URLs to be generated then extend this class and override the +urlFor+ 
+  URLs to be generated then extend this class and override the +request+ 
   method.
 
   Another way to override the above is to tell SC where member resources can
@@ -148,13 +148,15 @@ require('server') ;
 SC.RestServer = SC.Server.extend({
 
   /**
-    @see SC.Server.urlFor
+    @see SC.Server.request
   **/
-  urlFor: function(resource, action, ids, params, method) {
+  request: function(resource, action, ids, params, method) {
     url = resource;
     if (ids && ids.length == 1) url = url + '/' + ids[0];
     if (action && action != '') url = url + '/' + action;
-    return url;
+    params.url = url;
+
+    sc_super();
   },
 
 

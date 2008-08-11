@@ -77,6 +77,13 @@ SC.Server = SC.Object.extend({
     var cacheCode = params.cacheCode; delete params.cacheCode ;
     var url = params.url; delete params.url;
 
+    if (!url) {
+      var idPart = (ids && ids.length == 1) ? ids[0] : '';
+      url = this.urlFormat.format(resource, action) + idPart;
+    }
+
+    opts.emulateUncommonMethods = params.emulateUncommonMethods; delete params.emulateUncommonMethods ;
+
     opts.requestHeaders = {} ;
     opts.requestHeaders['X-SproutCore-Version'] = SC.VERSION ;
     opts.requestHeaders['Accept'] = 'application/sproutcore, application/json, */*' ;
@@ -84,17 +91,15 @@ SC.Server = SC.Object.extend({
     if (cacheCode) opts.requestHeaders['Sproutit-Cache'] = cacheCode ;
     opts.method = method || 'get' ;
 
-    if (!url) url = this.urlFor(resource, action, ids, params, opts.method) ;
-
     // handle ids
     if (ids && ids.length > 1) {
       params.ids = [ids].flatten().join(',') ;
     }
-    
+
     // convert parameters.
     var parameters = this._toQueryString(params) ;
     if (parameters && parameters.length > 0) {
-      if (opts.method == 'delete') {
+      if (!opts.emulateUncommonMethods && opts.method == 'delete') {
         // HTTP DELETE doesn't allow a post body; this should actually
         // be handled by prototype..
         url = url + (url.match(/\?/) ? "&" : "?") + parameters;
@@ -121,26 +126,9 @@ SC.Server = SC.Object.extend({
     } ; 
     
     console.log('REQUEST: %@ %@'.fmt(opts.method, url)) ;
-    
     request = new Ajax.Request(url,opts) ;
   },
 
-  /**
-    Generates the URL that is going to be called by this server. Note that you
-    should only return relative URLs. You can only call resources that are on
-    the same domain as where this script was downloaded from.
-
-    @param {String} resource  the URL where the collection of the resource can be queried
-    @param {String} action    the action that should be performed on the resource
-    @param {Array} ids        array of identifiers of your model instances
-    @param {Array} params     parameters that were passed to the SC.Server#request method
-    @param {String} method    the HTTP method that will be used
-    @returns {String} the URL to use in the request to the backend server
-  **/
-  urlFor: function(resource, action, ids, params, method) {
-    var idPart = (ids && ids.length == 1) ? ids[0] : '';
-    return this.urlFormat.format(resource, action) + idPart;
-  },
 
   // RECORD METHODS
   // These methods do the basic record changes.
