@@ -86,7 +86,7 @@ SC.Server = SC.Object.extend({
 
     opts.requestHeaders = {} ;
     opts.requestHeaders['X-SproutCore-Version'] = SC.VERSION ;
-    opts.requestHeaders['Accept'] = 'application/sproutcore, application/json, */*' ;
+    opts.requestHeaders['Accept'] = 'application/json, */*' ;
     if (accept) opts.requestHeaders['Accept'] = accept ;
     if (cacheCode) opts.requestHeaders['Sproutit-Cache'] = cacheCode ;
     opts.method = method || 'get' ;
