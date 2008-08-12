@@ -71,6 +71,14 @@ require('core') ;
 */
 SC.RailsServer = SC.RestServer.extend({
 
+  /**
+    Emulates PUT and DELETE requests by sending a POST with _method=put
+    resp. _method=delete in the post body.
+
+    Adds the authenticity token for POST, PUT and DELETE requests.
+
+    @see SC.Server.request
+  **/
   request: function(resource, action, ids, params, method) {
     params.emulateUncommonMethods = true;
 

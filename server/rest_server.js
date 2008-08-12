@@ -102,11 +102,6 @@ require('server') ;
   call for example GET /contacts?id=123,456,789 instead of making 3 separate
   calls.
 
-  Because some browsers cannot actually perform an HTTP PUT or HTTP DELETE it
-  will actually perform an HTTP POST but will put an additional key,value pair
-  in the post data packet. For HTTP PUT it will add _method='put' and for
-  HTTP DELETE it will add _method='delete' in the post data.
-
   Via the SC.Server#request method you can also call collection and member
   functions on your resource. Use the +action+ parameter for this. For
   example, server.request('contacts', 'archive', null, params, 'delete')

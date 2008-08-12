@@ -53,17 +53,36 @@ SC.Server = SC.Object.extend({
     this.refreshRecordsWithData(clientData,SC.Record,null,false);
   },
   
-  // This is the root method for accessing a server resource.  Pass in the
-  // resource URL, verb name, and any parameters.  There are several special-
-  // purpose parameters used also:
-  //
-  // onSuccess -- function invoked when request completes. Expects the format
-  //              didSucceed(status,ajaxRequest,cacheCode,context)
-  // onFailure -- function invoked when request fails. Same format.
-  // requestContext -- simply passed back.
-  // cacheCode -- String indicating the time of the last refresh.
-  // url -- override the default url building with this url.
-  //
+  /**
+    This is the root method for accessing a server resource.  Pass in the
+    resource URL, verb name, and any parameters.  There are several special-
+    purpose parameters used also:
+
+    onSuccess -- function invoked when request completes. Expects the format
+                 didSucceed(status,ajaxRequest,cacheCode,context)
+    onFailure -- function invoked when request fails. Same format.
+    requestContext -- simply passed back.
+    cacheCode -- String indicating the time of the last refresh.
+    url -- override the default url building with this url.
+
+    Because some browsers cannot actually perform an HTTP PUT or HTTP DELETE
+    it is recommended to perform an HTTP POST with an additional key,value
+    pair in the post data packet. For HTTP PUT add _method='put' and for
+    HTTP DELETE add _method='delete' in the post data. To have this done for
+    you simply add the following to the params hash before calling this 
+    method:
+
+    {{{
+      params.emulateUncommonMethods = true;
+    }}}
+
+    @param {String} resource the URL where the collection of the resource
+                             can be queried
+    @param {String} action the action that should be performed on the resource
+    @param {Array} ids array of identifiers of your model instances
+    @param {Array} params parameters to control behaviour of this request
+    @param {String} method the HTTP method that will be used
+  **/
   request: function(resource, action, ids, params, method) {
 
     // Get Settings and Options
