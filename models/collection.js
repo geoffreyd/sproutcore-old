@@ -172,8 +172,7 @@ SC.Collection = SC.Object.extend(
     
     var order = this.get('orderBy') ;
     if (order && !(order instanceof Array)) order = [order] ;
-    this.dataSource.listFor({
-      recordType: recordType,
+    this.dataSource.listFor(recordType, {
       offset: offset, 
       limit: this._limit,
       conditions: this.get('conditions'), 
