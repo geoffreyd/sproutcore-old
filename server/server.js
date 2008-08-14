@@ -308,12 +308,12 @@ SC.Server = SC.Object.extend({
     if (context._onSuccess) context._onSuccess(recs, json.count, cacheCode) ;
 
     // invoke custom user callback
-    if (context.onSuccess) context.onSuccess(transport, json, cacheCode, recs, json.count) ;
+    if (context.onSuccess) context.onSuccess(transport, cacheCode, recs, json.count) ;
   },
 
   _listNotModified: function(transport, cacheCode, context) {
     if (context._onSuccess) context._onSuccess() ;
-    if (context.onSuccess) context.onSuccess(transport, json, cacheCode, null, null) ;
+    if (context.onSuccess) context.onSuccess(transport, cacheCode, null, null) ;
   },
 
   _listFailure: function(transport, cacheCode, context) {
@@ -386,7 +386,7 @@ SC.Server = SC.Object.extend({
     // now this method will work so go do it.
     this.refreshRecordsWithData(json,context._recordType,cacheCode,true) ;
 
-    if (context.onSuccess) context.onSuccess(transport, json, cacheCode) ;
+    if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
   },
 
   _createFailure: function(transport, cacheCode, context) {
@@ -446,7 +446,7 @@ SC.Server = SC.Object.extend({
     var json = eval('json='+transport.responseText) ;
     if (!(json instanceof Array)) json = [json] ;
     this.refreshRecordsWithData(json,context._recordType,cacheCode,true) ;
-    if (context.onSuccess) context.onSuccess(transport, json, cacheCode) ;
+    if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
   },
 
   _refreshFailure: function(transport, cacheCode, context) {
@@ -536,7 +536,7 @@ SC.Server = SC.Object.extend({
     var json = eval('json='+transport.responseText) ;
     if (!(json instanceof Array)) json = [json] ;
     this.refreshRecordsWithData(json,context._recordType,cacheCode,true) ;
-    if (context.onSuccess) context.onSuccess(transport, json, cacheCode) ;
+    if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
   },
 
   _commitFailure: function(transport, cacheCode, context) {
