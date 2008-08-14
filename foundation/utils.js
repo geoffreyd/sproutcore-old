@@ -6,10 +6,75 @@
 // These are helpful utility functions for calculating range and rect values
 
 
-Object.extend(SC, 
+SC.mixin( 
 /** @scope SC */
 {
 
+  _downloadFrames: 0, // count of download frames inserted into document
+  
+  /**
+    Starts a download of the file at the named path.
+    
+    Use this method when you want to cause a file to be downloaded to a users
+    desktop instead of having it display in the web browser.  Note that your
+    server must return a header indicating that the file is intended for 
+    download also.
+  */
+  download: function(path) {
+    var tempDLIFrame=document.createElement('iframe');
+    var frameId = 'DownloadFrame_' + this._downloadFrames;
+    tempDLIFrame.setAttribute('id',frameId);
+    tempDLIFrame.style.border='10px';
+    tempDLIFrame.style.width='0px';
+    tempDLIFrame.style.height='0px';
+    tempDLIFrame.style.position='absolute';
+    tempDLIFrame.style.top='-10000px';
+    tempDLIFrame.style.left='-10000px';    
+    // Don't set the iFrame content yet if this is Safari
+    if (!(SC.isSafari())) {
+      tempDLIFrame.setAttribute('src',path);
+    }
+    document.getElementsByTagName('body')[0].appendChild(tempDLIFrame);
+    if (SC.isSafari()) {
+      tempDLIFrame.setAttribute('src',path);    
+    }
+    this._downloadFrames = this._downloadFrames + 1;
+    if (!(SC.isSafari())) {
+      var r = function() { 
+        document.body.removeChild(document.getElementById(frameId)); 
+        frameId = null;
+      } ;
+      var t = r.invokeLater(null, 2000);
+    }
+    //remove possible IE7 leak
+    tempDLIFrame = null;
+  },
+
+  /**
+    Takes a URL of any type and normalizes it into a fully qualified URL with
+    hostname.  For example:
+    
+    {{{
+      "some/path" => "http://localhost:4020/some/path" 
+      "/some/path" => "http://localhost:4020/some/path"
+      "http://localhost:4020/some/path" => "http://localhost:4020/some/path"
+    }}}
+    
+    @param url {String} the URL
+    @returns {String} the normalized URL
+  */
+  normalizeURL: function(url) {
+    if (url.slice(0,1) == '/') {
+      url = window.location.protocol + '//' + window.location.host + url ;
+    } else if ((url.slice(0,5) == 'http:') || (url.slice(0,6) == 'https:')) {
+      // no change
+    } else {
+      url = window.location.href + '/' + url ;
+    }
+    return url ;
+  },
+  
+  
   /** Return the left edge of the frame */
   minX: function(frame) { 
     return frame.x; 
@@ -142,9 +207,17 @@ Object.extend(SC,
 
     // add up all the offsets for the element.
     var element = el ;
+    var isFirefox3 = SC.Platform.Firefox >= 3 ;
     while (element) {
-      valueT += (element.offsetTop  || 0) + (element.clientTop  || 0);
-      valueL += (element.offsetLeft || 0) + (element.clientLeft || 0);
+      valueT += (element.offsetTop  || 0);
+      if (!isFirefox3 || (element !== el)) {
+        valueT += (element.clientTop  || 0);
+      }
+
+      valueL += (element.offsetLeft || 0);
+      if (!isFirefox3 || (element !== el)) {
+        valueL += (element.clientLeft || 0);
+      }
 
       // bizarely for FireFox if your offsetParent has a border, then it can 
       // impact the offset. 
@@ -157,6 +230,14 @@ Object.extend(SC,
             left *= 2; top *= 2 ;
           }
           valueL += left; valueT += top ;
+        }
+        
+        // In FireFox 3 -- the offsetTop/offsetLeft subtracts the clientTop/
+        // clientLeft of the offset parent.
+        var offsetParent = element.offsetParent ;
+        if ((SC.Platform.Firefox >= 3) && offsetParent) {
+          valueT -= offsetParent.clientTop ;
+          valueL -= offsetParent.clientLeft;
         }
       }
 

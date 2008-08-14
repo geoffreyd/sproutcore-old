@@ -165,8 +165,8 @@ SC.Record = SC.Object.extend(
     
     Override to actually support server changes.
   */
-  refresh: function() { 
-    if (!this.get('newRecord')) this.dataSource.refreshRecords([this]); 
+  refresh: function(options) { 
+    if (!this.get('newRecord')) this.dataSource.refreshRecords([this], options); 
   },
   
   /**
@@ -174,19 +174,21 @@ SC.Record = SC.Object.extend(
     to support server changes.  Note that this is used to support both the
     create and update components of CRUD.
   */
-  commit: function() {  
+  commit: function(options) {  
     // no longer a new record once changes have been committed.
     if (this.get('newRecord')) {
-      this.dataSource.createRecords([this]) ;
+      this.dataSource.createRecords([this], options) ;
     } else {
-      this.dataSource.commitRecords([this]) ;
+      this.dataSource.commitRecords([this], options) ;
     }
   },
   
   /**
     This can delete the record.  The non-server version just sets isDeleted.
   */
-  destroy: function() { this.dataSource.destroyRecords([this]) ; },
+  destroy: function(options) { 
+    this.dataSource.destroyRecords([this], options) ;
+  },
 
   // ...............................
   // ATTRIBUTES
@@ -503,6 +505,7 @@ SC.Record = SC.Object.extend(
     if (recValue && recValue.primaryKey) recValue = recValue.get(recValue.primaryKey) ;
     var stringify = (value instanceof RegExp);
     if (stringify)  {
+      if (recValue == null) return false ;
       return recValue.toString().match(value) ;
     } else {
        return recValue==value ;
@@ -678,7 +681,7 @@ SC.Record.mixin(
   find: function(guid) {
     var args ;
     if (typeof(guid) == 'object') {
-      args = $A(arguments) ;
+      args = SC.$A(arguments) ;
       args.push(this) ;
       var ret = SC.Store.findRecords.apply(SC.Store,args) ;
       return (ret && ret.length > 0) ? ret[0] : null ;
@@ -698,7 +701,7 @@ SC.Record.mixin(
   // Same as find except returns all records matching the passed conditions.
   findAll: function(filter) {
     if (!filter) filter = {} ;
-    args = $A(arguments) ; args.push(this) ; // add type
+    args = SC.$A(arguments) ; args.push(this) ; // add type
     return SC.Store.findRecords.apply(SC.Store,args) ;  
   },
   

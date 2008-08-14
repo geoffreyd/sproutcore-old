@@ -65,7 +65,7 @@ require('server') ;
       for many records    DELETE /sc/contacts?ids=1,2,3,4,5
 
   The above is the default behaviour of this server. If you want different 
-  URLs to be generated then extend this class and override the +urlFor+ 
+  URLs to be generated then extend this class and override the +request+ 
   method.
 
   Another way to override the above is to tell SC where member resources can
@@ -101,11 +101,6 @@ require('server') ;
   resource. If a collection of contacts needed to be refreshed it would still
   call for example GET /contacts?id=123,456,789 instead of making 3 separate
   calls.
-
-  Because some browsers cannot actually perform an HTTP PUT or HTTP DELETE it
-  will actually perform an HTTP POST but will put an additional key,value pair
-  in the post data packet. For HTTP PUT it will add _method='put' and for
-  HTTP DELETE it will add _method='delete' in the post data.
 
   Via the SC.Server#request method you can also call collection and member
   functions on your resource. Use the +action+ parameter for this. For
@@ -148,13 +143,15 @@ require('server') ;
 SC.RestServer = SC.Server.extend({
 
   /**
-    @see SC.Server.urlFor
+    @see SC.Server.request
   **/
-  urlFor: function(resource, action, ids, params, method) {
+  request: function(resource, action, ids, params, method) {
     url = resource;
     if (ids && ids.length == 1) url = url + '/' + ids[0];
     if (action && action != '') url = url + '/' + action;
-    return url;
+    params.url = url;
+
+    sc_super();
   },
 
 

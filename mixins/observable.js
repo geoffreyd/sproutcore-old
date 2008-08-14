@@ -297,7 +297,7 @@ SC.Observable = {
     }
   */  
   didChangeFor: function(context) {    
-    var keys = $A(arguments) ;
+    var keys = SC.$A(arguments) ;
     context = keys.shift() ;
     
     var ret = false ;
@@ -374,7 +374,7 @@ SC.Observable = {
     @returns {Array} Values of property keys.
   */
   getEach: function() {
-    var keys = $A(arguments).flatten() ;
+    var keys = SC.$A(arguments).flatten() ;
     var ret = [];
     for(var idx=0; idx<keys.length;idx++) {
       ret[ret.length] = this.getPath(keys[idx]);
@@ -603,6 +603,13 @@ SC.Observable = {
 
     // otherwise, bind as a normal property
     } else {      
+      
+      // if you add an observer beginning with '@', then we might need to 
+      // create or register the property...
+      if (this.reducedProperty && (key.charAt(0) === '@')) {
+        this.reducedProperty(key, undefined) ; // create if needed...
+      }
+      
       var observers = kvo.observers[key] = (kvo.observers[key] || []) ;
       var found = false; var loc = observers.length;
       while(!found && --loc >= 0) found = (observers[loc] == func) ;
@@ -646,7 +653,7 @@ SC.Observable = {
     @param propertyNames one or more property names
   */
   logProperty: function() {
-    var props = $A(arguments) ;
+    var props = SC.$A(arguments) ;
     for(var idx=0;idx<props.length; idx++) {
       var prop = props[idx] ;
       console.log('%@:%@: '.fmt(this._guid, prop), this.get(prop)) ;
@@ -686,7 +693,7 @@ SC.Observable = {
     change.
   */  
   registerDependentKey: function(key) {
-    var keys = $A(arguments) ;
+    var keys = SC.$A(arguments) ;
     var dependent = keys.shift() ;
     var kvo = this._kvo() ;
     for(var loc=0;loc<keys.length;loc++) {
@@ -803,11 +810,13 @@ SC.Observable = {
     
 } ;
 
+SC.mixin(Array.prototype, SC.Observable) ;
+
 // ........................................................................
 // FUNCTION ENHANCEMENTS
 //
 // Enhance function.
-Object.extend(Function.prototype,
+SC.mixin(Function.prototype,
 /** @scope Function.prototype */ {
   
   /**
@@ -918,14 +927,14 @@ Object.extend(Function.prototype,
     @returns {Function} the declared function instance
   */
   property: function() {
-    this.dependentKeys = $A(arguments) ; 
+    this.dependentKeys = SC.$A(arguments) ; 
     this.isProperty = true; return this; 
   },
   
   // Declare that a function should observe an object at the named path.  Note
   // that the path is used only to construct the observation one time.
   observes: function(propertyPaths) { 
-    this.propertyPaths = $A(arguments); 
+    this.propertyPaths = SC.$A(arguments); 
     return this;
   },
   
@@ -953,7 +962,7 @@ Object.extend(Function.prototype,
     if (interval === undefined) interval = 1 ;
     var f = this;
     if (arguments.length > 2) {
-      var args =$A(arguments).slice(2,arguments.length);
+      var args =SC.$A(arguments).slice(2,arguments.length);
       args.unshift(target);
       f = f.bind.apply(f, args) ;
     }

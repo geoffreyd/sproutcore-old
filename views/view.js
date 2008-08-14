@@ -711,7 +711,7 @@ SC.View = SC.Responder.extend(SC.PathModule,  SC.DelegateSupport,
           this.viewFrameDidChange() ;
         }
         ret = this.getStyle(key) ;
-        ret = (ret === 'auto') ? null : parseInt(ret, 0) ;
+        ret = (ret === 'auto') ? null : Math.round(parseFloat(ret)) ;
 
       // all other properties just pass through (and do not change frame)
       } else {
@@ -960,7 +960,8 @@ SC.View = SC.Responder.extend(SC.PathModule,  SC.DelegateSupport,
       // impact the offset
       if (SC.Platform.Firefox) {
         var parent = el.offsetParent ;
-        if (parent && (Element.getStyle(parent, 'overflow') != 'visible')) {
+        var overflow = (parent) ? Element.getStyle(parent, 'overflow') : 'visible' ;
+        if (overflow && overflow !== 'visible') {
           var left = parseInt(Element.getStyle(parent, 'borderLeftWidth'),0) || 0 ;
           var top = parseInt(Element.getStyle(parent, 'borderTopWidth'),0) || 0 ;
           f.x += left; f.y += top ;
@@ -1087,7 +1088,8 @@ SC.View = SC.Responder.extend(SC.PathModule,  SC.DelegateSupport,
       // impact the offset
       if (SC.Platform.Firefox) {
         var parent = el.offsetParent ;
-        if (parent && (Element.getStyle(parent, 'overflow') != 'visible')) {
+        var overflow = (parent) ? Element.getStyle(parent, 'overflow') : 'visible' ;
+        if (overflow && overflow !== 'visible') {
           var left = parseInt(Element.getStyle(parent, 'borderLeftWidth'),0) || 0 ;
           var top = parseInt(Element.getStyle(parent, 'borderTopWidth'),0) || 0 ;
           f.x += left; f.y += top ;
@@ -1321,7 +1323,7 @@ SC.View = SC.Responder.extend(SC.PathModule,  SC.DelegateSupport,
           prect.x -= scrollFrame.x ; 
           prect.y -= scrollFrame.y ;
         }
-        
+
         // blend with current frame
         f = SC.intersectRects(f, prect) ;
       } else {
@@ -2026,7 +2028,7 @@ SC.View.mixin({
     if (el && el._configured) return SC.View.findViewForElement(el); 
     
     // Now that we have found an element, instantiate the view.
-    var args = $A(arguments) ; args[0] = { rootElement: el } ;
+    var args = SC.$A(arguments) ; args[0] = { rootElement: el } ;
     if (r) vStart = new Date().getTime();
     var ret = new this(args,this) ; // create instance.
     if (r) SC.idt.v_t += (new Date().getTime()) - vStart;
@@ -2039,7 +2041,7 @@ SC.View.mixin({
   
   // create in the view work is like viewFor but with 'null' for el
   create: function(configs) {
-    var args = $A(arguments) ;
+    var args = SC.$A(arguments) ;
     args.unshift(null) ;
     return this.viewFor.apply(this,args) ;  
   },
