@@ -263,11 +263,13 @@ SC.Server = SC.Object.extend({
       return str.decamelize() ; //rubyify
     }).join(',') ;
 
-    var context = {'recordType': recordType} ;
-    context._onSuccess = options._onSuccess ;
-    context._onFailure = options._onFailure ;
-    context.onSuccess = options.onSuccess ;
-    context.onFailure = options.onFailure ;
+    var context = {
+      recordType : recordType,
+      _onSuccess : options._onSuccess,
+      _onFailure : options._onFailure,
+      onSuccess : options.onSuccess,
+      onFailure : options.onFailure
+    }
 
     var params = {} ;
     if (options.conditions) {
@@ -384,7 +386,7 @@ SC.Server = SC.Object.extend({
     }) ;
 
     // now this method will work so go do it.
-    this.refreshRecordsWithData(json,context._recordType,cacheCode,true) ;
+    this.refreshRecordsWithData(json, null, cacheCode, true) ;
 
     if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
   },
@@ -416,7 +418,7 @@ SC.Server = SC.Object.extend({
         var key = r.get(primaryKey);
         if (key) { ids.push(key); }
       });
-      
+
       var context = {
         _recordType : curRecords[0].recordType ; // default rec type
         onSuccess : options.onSuccess,
@@ -445,7 +447,7 @@ SC.Server = SC.Object.extend({
   _refreshSuccess: function(transport, cacheCode, context) {
     var json = eval('json='+transport.responseText) ;
     if (!(json instanceof Array)) json = [json] ;
-    this.refreshRecordsWithData(json,context._recordType,cacheCode,true) ;
+    this.refreshRecordsWithData(json, context._recordType, cacheCode, true) ;
     if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
   },
 
@@ -507,7 +509,6 @@ SC.Server = SC.Object.extend({
         }
 
         var context = {
-          records : records,
           onSuccess : options.onSuccess,
           onFailure : options.onFailure
         };
@@ -535,7 +536,7 @@ SC.Server = SC.Object.extend({
   _commitSuccess: function(transport, cacheCode, context) {
     var json = eval('json='+transport.responseText) ;
     if (!(json instanceof Array)) json = [json] ;
-    this.refreshRecordsWithData(json,context._recordType,cacheCode,true) ;
+    this.refreshRecordsWithData(json, null, cacheCode, true) ;
     if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
   },
 
@@ -550,7 +551,7 @@ SC.Server = SC.Object.extend({
   destroyRecords: function(records, options) {
     if (!records || records.length == 0) return ;
     if (!options) options = {} ;
-    
+
     var context = {
       onSuccess : options.onSuccess,
       onFailure : options.onFailure
@@ -602,7 +603,7 @@ SC.Server = SC.Object.extend({
   _destroySuccess: function(transport, cacheCode, context) {
     console.log('destroySuccess!') ;
     if (context.onSuccess) context.onSuccess(transport, cacheCode);
-    
+
   },
 
   _destroyFailure: function(transport, cacheCode, context) {
