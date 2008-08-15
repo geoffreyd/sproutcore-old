@@ -632,21 +632,20 @@ SC.Server = SC.Object.extend({
         var recordName = data.type.capitalize() ;
         if (server.prefix) {
           for (var prefixLoc = 0; prefixLoc < server.prefix.length; prefixLoc++) {
-            var prefixParts = server.prefix[prefixLoc].split('.');
-            var namespace = window;
-            for (var prefixPartsLoc = 0; prefixPartsLoc < prefixParts.length; prefixPartsLoc++) {
-              var namespace = namespace[prefixParts[prefixPartsLoc]] ;
-            }
-            if (namespace != window) data.recordType = namespace[recordName] ;
+            path = "%@.%@".format(server.prefix[prefixLoc], recordName) ;
+            data.recordType = SC.Object.objectForPropertyPath(path) ;
             if (data.recordType) break ;
           }
         } else data.recordType = window[recordName] ;
 
-        if (!data.recordType) console.log('skipping undefined recordType:'+recordName) ;
       } else data.recordType = recordType ;
 
-      if (!data.recordType) return null; // could not process.
-      else return data ;
+      if (!data.recordType) {
+        console.log('skipping undefined recordType:'+recordName) ; 
+        return null; // could not process.
+      }
+      
+      return data ;
     }).compact() ;
 
     // now update.
