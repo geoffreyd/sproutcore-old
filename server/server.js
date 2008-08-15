@@ -636,7 +636,7 @@ SC.Server = SC.Object.extend({
             data.recordType = SC.Object.objectForPropertyPath(path) ;
             if (data.recordType) break ;
           }
-        } else data.recordType = window[recordName] ;
+        } else data.recordType = SC.Object.objectForPropertyPath(recordName) ;
 
       } else data.recordType = recordType ;
 
