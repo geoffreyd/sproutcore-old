@@ -233,34 +233,68 @@ SC.mixin(SC.Object, /** @scope SC.Object */ {
   // ..........................................
   // PROPERTY SUPPORT METHODS
   //
-  // get the tuple for a property path (the object and key).
+
+  /**
+    Returns a tuple [object, key] for a property path.
+
+    For example, "Namespace.object.property" would return the object
+    referenced by "Namespace.object" relative to +root+ and the key
+    "property".
+
+    You can also provide a chained property path. For example,
+    "Namespace.object*anotherObject.property" would return the object
+    referenced by "Namespace.object" relative to +root+ and the key 
+    "anotherObject.property".
+
+    @param {String} path
+    @param {Object} root
+    @return 
+    @see #objectForPropertyPath
+  **/
   tupleForPropertyPath: function(path,root) {
     if (path.constructor == Array) return path ;
-    
+
     // * = the rest is a chained property.
     var parts = path.split('*') ; var key = null ;
     if (parts && parts.length > 1) {
       key = parts.pop(); path = parts.join('*') ;
     }
-    
+
     // get object path. property is last part if * was nt found.
     parts = path.split('.') ;
     if (!key) key = parts.pop() ;
-    
+
     // convert path to object.
     var obj = this.objectForPropertyPath(parts,root) ;
     return (obj && key) ? [obj,key] : null ;
   },
-  
+
+  /**
+    Returns the object relative to the given root for a given property path.
+
+    A property path is a string that is used to reference some property.
+    For example the absolute property path "Namespace.object.property"
+    refers to the property "property" on the object "Namespace.object".
+
+    Referencing properties in this way is often used when setting up
+    bindings and referencing application views.
+
+    @param {String or Array} path  The property path.
+    @param {Object} root  The object that serves as the starting point
+                          for the property path. Defaults to the
+                          global +window+ instance.
+    @return The object relative to the given root, or +undefined+ when
+            no object could be found.
+  **/
   objectForPropertyPath: function(path,root) {
     var parts = ($type(path) === T_STRING) ? path.split('.') : path ;
     if (!root) root = window ;
     var loc = 0, max = parts.length, key = null;
     while((loc < max) && (root)) {
       key = parts[loc++];
-      if (key) root = (root.get) ? root.get(key) : root[key] ;
+      if (key) root = (root.get instanceof Function) ? root.get(key) : root[key] ;
     }
-    return (loc < max) ? undefined : root ;  
+    return (loc < max) ? undefined : root ;
   },
   
   
