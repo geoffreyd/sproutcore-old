@@ -132,7 +132,7 @@ SC.Server = SC.Object.extend({
       if (!options.emulateUncommonMethods && options.method == 'delete') {
         // HTTP DELETE doesn't allow a post body; this should actually
         // be handled by prototype..
-        url = url + (url.match(/\?/) ? "&" : "?") + parameters;
+        url += (url.include('?') ? '&' : '?') + parameters;
       } else {
         options.parameters = parameters;
       }
@@ -421,7 +421,7 @@ SC.Server = SC.Object.extend({
       });
 
       var context = {
-        recordType: curRecords[0].recordType ; // default rec type
+        recordType: curRecords[0].recordType, // default record type
         onSuccess: options.onSuccess,
         onFailure: options.onFailure
       };
