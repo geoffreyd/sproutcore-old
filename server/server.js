@@ -560,41 +560,35 @@ SC.Server = SC.Object.extend({
 
     records = this._recordsByResource(records) ; // sort by resource.
     for(var resource in records) {
-      var curRecords = records[resource] ;
+      var curRecords = context.records = records[resource] ;
 
       if (resource == '*') {
-        curRecords.each(function(rec){
-          rec.set('isDeleted',true) ;
-          SC.Store.removeRecord(rec) ;
-        });
+        this._destroySuccess(null, null, {records: curRecords}) ;
         continue ;
       }
 
-      // collect resource ids, sort records into hash, and get cacheCode.
+      // collect resource ids that can be deleted in the backend
       var ids = [] ; var key ;
       var primaryKey = curRecords[0].get('primaryKey') ;
-
       curRecords.each(function(rec) {
-        if ((key = rec.get(primaryKey)) && (!rec.get('newRecord'))) {
-          ids.push(key) ;
-        }
-        rec.set('isDeleted',true) ;
-        SC.Store.removeRecord(rec) ;
+        if ((key = rec.get(primaryKey)) && (!rec.get('newRecord'))) ids.push(key) ;
       }) ;
 
-      // issue request -- we may not have ids to send tho (for ex, if all
-      // records were newRecords.)
-      if (ids && ids.length > 0) {
-        var params = {
-          requestContext: context,
-          _onSuccess: this._destroySuccess.bind(this),
-          _onFailure: this._destroyFailure.bind(this)
-        };
-
-        if (ids.length == 1 && curRecords[0].destroyURL) params['url'] = curRecords[0].destroyURL;
-
-        this.request(resource, this._destroyAction, ids, params, this._destroyMethod) ;
+      if (ids.length == 0) {
+        // all records were newRecords
+        this._destroySuccess(null, null, {records: curRecords}) ;
+        continue;
       }
+
+      var params = {
+        requestContext: context,
+        _onSuccess: this._destroySuccess.bind(this),
+        _onFailure: this._destroyFailure.bind(this)
+      };
+
+      if (ids.length == 1 && curRecords[0].destroyURL) params['url'] = curRecords[0].destroyURL;
+
+      this.request(resource, this._destroyAction, ids, params, this._destroyMethod) ;
     }
   },
 
@@ -602,12 +596,14 @@ SC.Server = SC.Object.extend({
   _destroyMethod: 'post',
 
   _destroySuccess: function(transport, cacheCode, context) {
-    if (context.onSuccess) context.onSuccess(transport, cacheCode);
+    SC.Store.destroyRecords(context.records);
+
+    if (context.onSuccess) context.onSuccess(transport, cacheCode, context.records);
   },
 
   _destroyFailure: function(transport, cacheCode, context) {
     console.log('destroyFailed!') ;
-    if (context.onFailure) context.onFailure(transport, cacheCode);
+    if (context.onFailure) context.onFailure(transport, cacheCode, context.records);
   },
 
   // ..........................................
