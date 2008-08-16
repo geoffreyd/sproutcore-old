@@ -644,7 +644,7 @@ SC.Object.prototype = {
   // 
 
   /**  
-    Activates any outlet connections in the the object.  This is called 
+    Activates any outlet connections in the object.  This is called 
     automatically for views typically.
     
     A view may contain outlets.  Outlets are a way to find and connect to

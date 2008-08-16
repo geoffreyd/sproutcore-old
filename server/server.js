@@ -332,7 +332,7 @@ SC.Server = SC.Object.extend({
     if (!records || records.length == 0) return ;
     if (!options) options = {} ;
 
-    records = this._recordsByResource(records) ; // sort by resource.
+    records = records.byResourceURL() ; // group by resource.
     for(var resource in records) {
       if (resource == '*') continue ;
 
@@ -405,7 +405,7 @@ SC.Server = SC.Object.extend({
     if (!records || records.length == 0) return ;
     if (!options) options = {} ;
 
-    records = this._recordsByResource(records) ; // sort by resource.
+    records = records.byResourceURL() ; // group by resource.
     for(var resource in records) {
       if (resource == '*') continue ;
 
@@ -464,7 +464,7 @@ SC.Server = SC.Object.extend({
     if (!records || records.length == 0) return ;
     if (!options) options = {} ;
 
-    records = this._recordsByResource(records) ; // sort by resource.
+    records = records.byResourceURL() ; // group by resource.
     for(var resource in records) {
       if (resource == '*') continue ;
 
@@ -558,7 +558,7 @@ SC.Server = SC.Object.extend({
       onFailure: options.onFailure
     };
 
-    records = this._recordsByResource(records) ; // sort by resource.
+    records = records.byResourceURL() ; // group by resource.
     for(var resource in records) {
       var curRecords = context.records = records[resource] ;
 
@@ -650,17 +650,6 @@ SC.Server = SC.Object.extend({
 
   // ................................
   // PRIVATE METHODS
-
-  // places records from array into hash, sorted by resourceURL.
-  _recordsByResource: function(records) {
-    var ret = {} ;
-    records.each(function(rec) {
-      var recs = ret[rec.resourceURL || '*'] || [] ;
-      recs.push(rec)  ;
-      ret[rec.resourceURL || '*'] = recs ;
-    }) ;
-    return ret ;
-  },
 
   _camelizeData: function(data) {
     if (data == null) return data ;

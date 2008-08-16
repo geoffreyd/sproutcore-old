@@ -253,7 +253,18 @@ SC.Array.slice = function(beginIndex, endIndex) {
         ret = (value === undefined) ? this.invoke('get', key) : null ;
       }
       return ret ;
-    }
+    },
+    
+    // places records from array into hash, sorted by resourceURL.
+    byResourceURL: function() {
+      var ret = {} ;
+      this.each(function(rec) {
+        var recs = ret[rec.resourceURL || '*'] || [] ;
+        recs.push(rec)  ;
+        ret[rec.resourceURL || '*'] = recs ;
+      }) ;
+      return ret ;
+    },    
     
   }) ;
   
