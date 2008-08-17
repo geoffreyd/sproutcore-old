@@ -14,7 +14,7 @@
   <head>
     <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
 <%  # @title will be defined if you passed :title in routes.rb -%>
-    <title><%= @content_for_page_title || (@title.to_s || bundle_name.to_s || '').capitalize %></title>
+    <title><%= yield(:page_title) || (@title.to_s || bundle_name.to_s || '').capitalize %></title>
     <script src="<%= static_url('detect-browser') %>" type="text/javascript"></script>
 
     <% #
@@ -29,7 +29,7 @@
        #   <% end %>
     -%>
     <%= stylesheets_for_client %>
-    <%= @content_for_page_styles %>
+    <%= yield :page_styles %>
   </head>
   <body class="<%= @theme || 'sc-theme' %> focus">
     <script type="text/javascript">
@@ -42,7 +42,7 @@
        # your partials.
     -%>
     <!-- Main Page Body -->
-    <%= @content_for_body %>
+    <%= yield :body %>
 
     <% #
        # This is where the resources you delcare will appear.  You must
@@ -51,7 +51,7 @@
     -%>
     <!-- Resources to be removed from DOM on page load -->
     <div id="resources" style="display:none; visibility: hidden;">
-      <%= @content_for_resources -%>
+      <%= yield :resources -%>
     </div>
 
     <% #
@@ -68,7 +68,7 @@
     -%>
     <!-- Include Site Javascript -->
     <%= javascripts_for_client %>
-    <%= @content_for_page_javascript %>
+    <%= yield :page_javascript %>
 
     <% #
        # The following lines to the closing body tag must be included at the
@@ -80,6 +80,6 @@
 
     <!-- Start SproutCore on Page Load -->
     <script type="text/javascript">window.onload = SC.didLoad;</script>
-    <%= @content_for_final %>
+    <%= yield :final %>
   </body>
 </html>
