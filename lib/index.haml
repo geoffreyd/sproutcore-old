@@ -23,6 +23,11 @@
     -#
     = stylesheets_for_client
     = yield :page_styles
+
+    -# Add any other things you want to add to the page <head> section via 
+    -#   - content_for :page_header do
+    -#
+    = yield :page_head
   %body{ :class => "#{@theme || 'sc-theme'} focus" }
     :javascript
       if (SC.setupBodyClassNames) SC.setupBodyClassNames();
