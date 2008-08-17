@@ -9,7 +9,7 @@
 %html
   %head
     %meta{ :content => "text/html; charset=utf-8", "http-equiv" => "Content-type" }
-    %title= (@title.to_s || bundle_name.to_s || '').capitalize
+    %title= yield(:page_title) || (@title.to_s || bundle_name.to_s || '').capitalize
     %script{ :src => static_url('detect-browser'), :type => "text/javascript" }
 
     -# This line should appear in your head area to include the stylesheets
