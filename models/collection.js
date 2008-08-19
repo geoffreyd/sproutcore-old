@@ -156,13 +156,8 @@ SC.Collection = SC.Object.extend(
     Call this to force the list to refresh.  The refresh may not happen
     right away, depending on the dataSource.
   */
-  refresh: function() {
+  refresh: function(options) {
     var recordType = this.get('recordType') || SC.Record ;
-    var offset = (this._limit > 0) ? this._offset : 0 ;
-    
-    if (!this._boundRefreshFunc) {
-      this._boundRefreshFunc = this._refreshDidComplete.bind(this) ;
-    }    
     
     // start refresh
     if (!this.dataSource) throw "collection does not have dataSource" ;
@@ -172,14 +167,17 @@ SC.Collection = SC.Object.extend(
     
     var order = this.get('orderBy') ;
     if (order && !(order instanceof Array)) order = [order] ;
-    this.dataSource.listFor(recordType, {
-      offset: offset, 
-      limit: this._limit,
-      conditions: this.get('conditions'), 
-      order: order,
-      callback: this._boundRefreshFunc,
-      cacheCode: this._cacheCode
-    }) ;
+    
+    if (!options) options = {} ;
+    options.offset = (this._limit > 0) ? this._offset : 0 ;
+    options.limit = this._limit ;
+    options.conditions = this.get('conditions') ;
+    options.order = order ;
+    options._onSuccess = this._refreshDidComplete.bind(this) ;
+    options._onFailure = options._onSuccess ;
+    options.cacheCode = this._cacheCode ;
+    
+    this.dataSource.listFor(recordType, options) ;
     this.endPropertyChanges() ;
     return this; 
   },
@@ -220,7 +218,7 @@ SC.Collection = SC.Object.extend(
   // This is the callback executed when the data source has found the records
   // matching the passed parameters.  The count is the total count of records
   // matching the conditions, ignoring the offset and limit.
-  _refreshDidComplete: function(records,count,cacheCode) {
+  _refreshDidComplete: function(records, count, cacheCode) {
     if (cacheCode) this._cacheCode = cacheCode;
 
     if (records) {

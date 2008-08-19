@@ -165,8 +165,8 @@ SC.Record = SC.Object.extend(
     
     Override to actually support server changes.
   */
-  refresh: function() { 
-    if (!this.get('newRecord')) this.dataSource.refreshRecords([this]); 
+  refresh: function(options) { 
+    if (!this.get('newRecord')) this.dataSource.refreshRecords([this], options); 
   },
   
   /**
@@ -174,19 +174,21 @@ SC.Record = SC.Object.extend(
     to support server changes.  Note that this is used to support both the
     create and update components of CRUD.
   */
-  commit: function() {  
+  commit: function(options) {  
     // no longer a new record once changes have been committed.
     if (this.get('newRecord')) {
-      this.dataSource.createRecords([this]) ;
+      this.dataSource.createRecords([this], options) ;
     } else {
-      this.dataSource.commitRecords([this]) ;
+      this.dataSource.commitRecords([this], options) ;
     }
   },
   
   /**
     This can delete the record.  The non-server version just sets isDeleted.
   */
-  destroy: function() { this.dataSource.destroyRecords([this]) ; },
+  destroy: function(options) { 
+    this.dataSource.destroyRecords([this], options) ;
+  },
 
   // ...............................
   // ATTRIBUTES

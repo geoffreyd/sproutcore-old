@@ -48,6 +48,11 @@ SC.Server = SC.Object.extend({
   // Set this string to true when escaping the JSON string is necessary
   escapeJSON: true,
 
+  // Global server handlers you can initialize when creating this server.
+  // If set, they will be called after each request.
+  onSuccess: null,
+  onFailure: null,
+
   // call this in your main to preload any data sent from the server with the
   // initial page load.
   preload: function(clientData) {
@@ -90,8 +95,10 @@ SC.Server = SC.Object.extend({
     // Get Settings and Options
     if (!params) params = {} ;
     var options = {} ;
-    var onSuccess = params.onSuccess; delete params.onSuccess;
-    var onNotModified = params.onNotModified; delete params.onNotModified ;
+    var _onSuccess = params._onSuccess; delete params._onSuccess ;
+    var _onNotModified = params._onNotModified; delete params._onNotModified ;
+    var _onFailure = params._onFailure ; delete params._onFailure ;
+    var onSuccess = params.onSuccess ; delete params.onSuccess ;
     var onFailure = params.onFailure ; delete params.onFailure ;
     var context = params.requestContext ; delete params.requestContext ;
     var accept = params.accept ; delete params.accept ;
@@ -105,11 +112,13 @@ SC.Server = SC.Object.extend({
 
     options.emulateUncommonMethods = params.emulateUncommonMethods; delete params.emulateUncommonMethods ;
 
-    options.requestHeaders = {} ;
+    options.requestHeaders = params.requestHeaders ; delete params.requestHeaders ;
+    if (!options.requestHeaders) options.requestHeaders = {} ;
     options.requestHeaders['X-SproutCore-Version'] = SC.VERSION ;
     options.requestHeaders['Accept'] = 'application/json, */*' ;
     if (accept) options.requestHeaders['Accept'] = accept ;
     if (cacheCode) options.requestHeaders['Sproutit-Cache'] = cacheCode ;
+
     options.method = method || 'get' ;
 
     // handle ids
@@ -123,30 +132,40 @@ SC.Server = SC.Object.extend({
       if (!options.emulateUncommonMethods && options.method == 'delete') {
         // HTTP DELETE doesn't allow a post body; this should actually
         // be handled by prototype..
-        url = url + (url.match(/\?/) ? "&" : "?") + parameters;
+        url += (url.include('?') ? '&' : '?') + parameters;
       } else {
         options.parameters = parameters;
       }
     }
 
+    var server = this ;
     var request = null ; //will container the ajax request
 
     // Save callback functions.
     options.onSuccess = function(transport) {
       var cacheCode = request.getHeader('Last-Modified') ;
-      if ((transport.status == '200') && (transport.responseText == '304 Not Modified')) {
-        if (onNotModified) onNotModified(transport.status, transport, cacheCode,context);
+      var bubble = true;
+      if (onSuccess) bubble = (false != onSuccess(transport, cacheCode, context));
+      if (bubble && server.onSuccess) bubble = (false != server.onSuccess(transport, cacheCode, context));
+      if (bubble) if ((transport.status == '200') && (transport.responseText == '304 Not Modified')) {
+        if (_onNotModified) _onNotModified(transport, cacheCode, context);
       } else {
-        if (onSuccess) onSuccess(transport.status, transport, cacheCode,context);
+        if (_onSuccess) _onSuccess(transport, cacheCode, context);
       }
     } ;
 
     options.onFailure = function(transport) {
       var cacheCode = request.getHeader('Last-Modified') ;
-      if (onFailure) onFailure(transport.status, transport, cacheCode,context);
+      var bubble = true;
+      if (onFailure) bubble = (false != onFailure(transport, cacheCode, context));
+      if (bubble && server.onFailure) bubble = (false != server.onFailure(transport, cacheCode, context));
+      if (bubble && _onFailure) _onFailure(transport, cacheCode, context);
     } ;
 
+    // opts.evalJS == 'force'; // forces evaluation of response
+
     console.log('REQUEST: %@ %@'.fmt(options.method, url)) ;
+
     request = new Ajax.Request(url,options) ;
   },
 
@@ -193,13 +212,17 @@ SC.Server = SC.Object.extend({
              queried. So at 10, it would skip the first 9 records.
     |limit| An integer indicating the limit on the number of recors that
             should be returned.
-    |callback| A function to be called upon successful retrieval of the
-              records from the backend server. The function can take 2
-              arguments: records, count. The first argument, records,
-              is an array of SC.Record objects of the same type as
-              specified by the +recordType+ argument. The second argument,
-              count, indicates the total count of records matching the
-              conditions, but ignoring the offset and limit.
+    |onSuccess| A function to be called upon successful retrieval of the
+                records from the backend server. The function can take 3
+                arguments: records, count, json. The first argument, records,
+                is an array of SC.Record objects of the same type as
+                specified by the +recordType+ argument. The second argument,
+                count, indicates the total count of records matching the
+                conditions, but ignoring the offset and limit. The third
+                argument, json, contains the complete json response from the
+                server.
+    |onFailure| A function to be called when a failure occurred. It takes the
+                same arguments as the onSuccess handler.
 
     In addition, all the options that the +request+ method accepts are
     accepted here as well (@see SC.Server#request).
@@ -217,11 +240,13 @@ SC.Server = SC.Object.extend({
     Example:
 
     {{{
-      { records: [ {id:1, type:'Task', title:'1st task'},
-                   {id:2, type:'Task', title:'2nd task'}
+      { 
+        records: [ {id:1, type:'Task', title:'1st task'},
+                   {id:2, type:'Task', title:'2nd task'},
                    {id:3, type:'Task', title:'3rd task'} ],
-      :ids => [1,2,3],
-      :count => 100 }
+        ids: [1,2,3],
+        count: 100 
+      }
     }}}
 
     @param {Object} recordType the type of the records to query, subclass of
@@ -240,18 +265,25 @@ SC.Server = SC.Object.extend({
       return str.decamelize() ; //rubyify
     }).join(',') ;
 
-    params = {} ;
+    var context = {
+      recordType: recordType,
+      _onSuccess: options._onSuccess,
+      _onFailure: options._onFailure,
+      onSuccess: options.onSuccess,
+      onFailure: options.onFailure
+    }
+
+    var params = {} ;
     if (options.conditions) {
       var conditions = this._decamelizeData(options.conditions) ;
       for(var key in conditions) {
         params[key] = conditions[key] ;
       }
     }
-
-    params.requestContext = options ;
-    params.onSuccess = this._listSuccess.bind(this) ;
-    params.onNotModified = this._listNotModified.bind(this) ;
-    params.onFailure = this._listFailure.bind(this) ;
+    params.requestContext = context ;
+    params._onSuccess = this._listSuccess.bind(this) ;
+    params._onNotModified = this._listNotModified.bind(this) ;
+    params._onFailure = this._listFailure.bind(this) ;
     if (options.cacheCode) params.cacheCode = options.cacheCode ;
     if (options.offset) params.offset = options.offset;
     if (options.limit) params.limit = options.limit ;
@@ -262,30 +294,32 @@ SC.Server = SC.Object.extend({
   _listForAction: 'list',
   _listMethod: 'get',
 
-  _listSuccess: function(status, transport, cacheCode, context) {
+  _listSuccess: function(transport, cacheCode, context) {
     var json = eval('json='+transport.responseText) ;
     if (!json) { console.log('invalid json!'); return; }
-
-    // first, build any records passed back
-    if (json.records) {
-      this.refreshRecordsWithData(json.records,context.recordType,cacheCode,false);
-    }
+    if (json.records) this.refreshRecordsWithData(json.records, context.recordType, cacheCode, false);
 
     // next, convert the list of ids into records.
     var recs = (json.ids) ? json.ids.map(function(guid) {
       return SC.Store.getRecordFor(guid,context.recordType) ;
     }) : [] ;
 
-    // now invoke callback
-    if (context.callback) context.callback(recs,json.count,cacheCode) ;
+    // invoke internal callback
+    if (context._onSuccess) context._onSuccess(recs, json.count, cacheCode) ;
+
+    // invoke custom user callback
+    if (context.onSuccess) context.onSuccess(transport, cacheCode, recs, json.count) ;
   },
 
-  _listNotModified: function(status, transport, cacheCode, context) {
-    if (context.callback) context.callback(null,null,null) ;
+  _listNotModified: function(transport, cacheCode, context) {
+    if (context._onSuccess) context._onSuccess() ;
+    if (context.onSuccess) context.onSuccess(transport, cacheCode, null, null) ;
   },
 
-  _listFailure: function(status, transport, cacheCode, records) {
+  _listFailure: function(transport, cacheCode, context) {
     console.log('listFailed!') ;
+    if (context._onFailure) context._onFailure() ;
+    if (context.onFailure) context.onFailure(transport, cacheCode) ;
   },
 
 
@@ -294,31 +328,38 @@ SC.Server = SC.Object.extend({
 
   // send the records back to create them. added a special parameter to
   // the hash for each record, _guid, which will be used onSuccess.
-  createRecords: function(records) {
+  createRecords: function(records, options) {
     if (!records || records.length == 0) return ;
+    if (!options) options = {} ;
 
-    records = this._recordsByResource(records) ; // sort by resource.
+    records = records.byResourceURL() ; // group by resource.
     for(var resource in records) {
       if (resource == '*') continue ;
 
       var curRecords = records[resource] ;
 
       // collect data for records
-      var server = this ; var context = {} ;
+      var server = this ; var recs = {} ;
       var data = curRecords.map(function(rec) {
         var recData = server._decamelizeData(rec.getPropertyData()) ;
         recData._guid = rec._guid ;
-        context[rec._guid] = rec ;
+        recs[rec._guid] = rec ;
         return recData ;
       }) ;
 
-      // issue request
-      this.request(resource, this._createAction, null, {
+      context.records = recs ;
+      context.onSuccess = options.onSuccess ;
+      context.onFailure = options.onFailure ;
+
+      var params = {
         requestContext: context,
-        onSuccess: this._createSuccess.bind(this),
-        onFailure: this._createFailure.bind(this),
+        _onSuccess: this._createSuccess.bind(this),
+        _onFailure: this._createFailure.bind(this),
         records: data
-      }, this._createMethod) ;
+      };
+
+      // issue request
+      this.request(resource, this._createAction, null, params, this._createMethod) ;
     }
   },
 
@@ -327,59 +368,69 @@ SC.Server = SC.Object.extend({
 
   // This method is called when a create is successful.  It first goes through
   // and assigns the primaryKey to each record.
-  _createSuccess: function(status, transport, cacheCode, context) {
+  _createSuccess: function(transport, cacheCode, context) {
     var json = eval('json='+transport.responseText) ;
-    if (!(json instanceof Array)) json = [json] ;
+    if (!json) { console.log('invalid json!'); return; }
 
     // first go through and assign the primaryKey to each record.
-    if (!context) context = {} ;
-    json.each(function(data) {
-      var guid = data._guid ;
-      var rec = (guid) ? context[guid] : null ;
-      if (rec) {
-        var pk = rec.get('primaryKey') ;
-        var dataKey = (pk == 'guid') ? 'id' : pk.decamelize().toLowerCase().replace(/\-/g,'_') ;
-        rec.set(pk,data[dataKey]) ;
-        rec.set('newRecord',false) ;
-      }
-    }) ;
+    if (json.records) {
+      json.records.each(function(data) {
+        var guid = data._guid ;
+        var rec = (guid) ? context.records[guid] : null ;
+        if (rec) {
+          var pk = rec.get('primaryKey') ;
+          var dataKey = (pk == 'guid') ? 'id' : pk.decamelize().toLowerCase().replace(/\-/g,'_') ;
+          rec.set(pk,data[dataKey]) ;
+          rec.set('newRecord',false) ;
+        }
+      }) ;
 
-    // now this method will work so go do it.
-    this.refreshRecordsWithData(json,context._recordType,cacheCode,true) ;
+      // now this method will work so go do it.
+      this.refreshRecordsWithData(json.records, context.recordType, cacheCode, true) ;
+    }
+
+    if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
   },
 
-  _createFailure: function(status, transport, cacheCode, records) {
+  _createFailure: function(transport, cacheCode, context) {
     console.log('createFailed!') ;
+    if (context.onFailure) context.onFailure(transport, cacheCode) ;
   },
 
 
   // ..........................................
   // REFRESH
 
-  refreshRecords: function(records) {
+  refreshRecords: function(records, options) {
     if (!records || records.length == 0) return ;
+    if (!options) options = {} ;
 
-    records = this._recordsByResource(records) ; // sort by resource.
+    records = records.byResourceURL() ; // group by resource.
     for(var resource in records) {
       if (resource == '*') continue ;
 
       var curRecords = records[resource] ;
 
       // collect resource ids, sort records into hash, and get cacheCode.
-      var cacheCode = null ; var ids = [] ; var context = {} ;
+      var cacheCode = null ; var ids = [] ;
       var primaryKey = curRecords[0].get('primaryKey') ; // assumes all the same
       curRecords.each(function(r) {
         cacheCode = cacheCode || r._cacheCode ;
         var key = r.get(primaryKey);
-        if (key) { ids.push(key); context[key] = r; }
+        if (key) { ids.push(key); }
       });
-      context._recordType = curRecords[0].recordType ; // default rec type.
 
-      params = {
+      var context = {
+        recordType: curRecords[0].recordType, // default record type
+        onSuccess: options.onSuccess,
+        onFailure: options.onFailure
+      };
+
+      var params = {
         requestContext: context,
         cacheCode: ((cacheCode=='') ? null : cacheCode),
-        onSuccess: this._refreshSuccess.bind(this),
-        onFailure: this._refreshFailure.bind(this)
+        _onSuccess: this._refreshSuccess.bind(this),
+        _onFailure: this._refreshFailure.bind(this)
       };
 
       if (ids.length == 1 && curRecords[0].refreshURL) params['url'] = curRecords[0].refreshURL;
@@ -394,23 +445,26 @@ SC.Server = SC.Object.extend({
 
   // This method is called when a refresh is successful.  It expects an array
   // of hashes, which it will convert to records.
-  _refreshSuccess: function(status, transport, cacheCode, context) {
+  _refreshSuccess: function(transport, cacheCode, context) {
     var json = eval('json='+transport.responseText) ;
-    if (!(json instanceof Array)) json = [json] ;
-    this.refreshRecordsWithData(json,context._recordType,cacheCode,true) ;
+    if (!json) { console.log('invalid json!'); return; }    
+    if (json.records) this.refreshRecordsWithData(json.records, context.recordType, cacheCode, true);
+    if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
   },
 
-  _refreshFailure: function(status, transport, cacheCode, records) {
+  _refreshFailure: function(transport, cacheCode, context) {
     console.log('refreshFailed!') ;
+    if (context.onFailure) context.onFailure(transport, cacheCode) ;
   },
 
   // ..........................................
   // COMMIT
 
-  commitRecords: function(records) {
+  commitRecords: function(records, options) {
     if (!records || records.length == 0) return ;
+    if (!options) options = {} ;
 
-    records = this._recordsByResource(records) ; // sort by resource.
+    records = records.byResourceURL() ; // group by resource.
     for(var resource in records) {
       if (resource == '*') continue ;
 
@@ -455,10 +509,15 @@ SC.Server = SC.Object.extend({
           if (key) ids.push(key);
         }
 
-        params = {
-          requestContext: records,
-          onSuccess: this._commitSuccess.bind(this),
-          onFailure: this._commitFailure.bind(this),
+        var context = {
+          onSuccess: options.onSuccess,
+          onFailure: options.onFailure
+        };
+
+        var params = {
+          requestContext: context,
+          _onSuccess: this._commitSuccess.bind(this),
+          _onFailure: this._commitFailure.bind(this),
           records: data
         };
 
@@ -475,71 +534,76 @@ SC.Server = SC.Object.extend({
 
   // This method is called when a refresh is successful.  It expects an array
   // of hashes, which it will convert to records.
-  _commitSuccess: function(status, transport, cacheCode, context) {
+  _commitSuccess: function(transport, cacheCode, context) {
     var json = eval('json='+transport.responseText) ;
-    if (!(json instanceof Array)) json = [json] ;
-    this.refreshRecordsWithData(json,context._recordType,cacheCode,true) ;
+    if (!json) { console.log('invalid json!'); return; }
+    if (json.records) this.refreshRecordsWithData(json.records, context.recordType, cacheCode, true);
+    if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
   },
 
-  _commitFailure: function(status, transport, cacheCode, records) {
+  _commitFailure: function(transport, cacheCode, context) {
     console.log('commitFailed!') ;
+    if (context.onFailure) context.onFailure(transport, cacheCode) ;
   },
 
   // ..........................................
   // DESTROY
 
-  destroyRecords: function(records) {
+  destroyRecords: function(records, options) {
     if (!records || records.length == 0) return ;
+    if (!options) options = {} ;
 
-    records = this._recordsByResource(records) ; // sort by resource.
+    var context = {
+      onSuccess: options.onSuccess,
+      onFailure: options.onFailure
+    };
+
+    records = records.byResourceURL() ; // group by resource.
     for(var resource in records) {
-      var curRecords = records[resource] ;
+      var curRecords = context.records = records[resource] ;
 
       if (resource == '*') {
-        curRecords.each(function(rec){
-          rec.set('isDeleted',true) ;
-          SC.Store.removeRecord(rec) ;
-        });
+        this._destroySuccess(null, null, {records: curRecords}) ;
         continue ;
       }
 
-      // collect resource ids, sort records into hash, and get cacheCode.
+      // collect resource ids that can be deleted in the backend
       var ids = [] ; var key ;
       var primaryKey = curRecords[0].get('primaryKey') ;
-
       curRecords.each(function(rec) {
-        if ((key = rec.get(primaryKey)) && (!rec.get('newRecord'))) {
-          ids.push(key) ;
-        }
-        rec.set('isDeleted',true) ;
-        SC.Store.removeRecord(rec) ;
+        if ((key = rec.get(primaryKey)) && (!rec.get('newRecord'))) ids.push(key) ;
       }) ;
 
-      // issue request -- we may not have ids to send tho (for ex, if all
-      // records were newRecords.)
-      if (ids && ids.length > 0) {
-        params = {
-          requestContext: records,
-          onSuccess: this._destroySuccess.bind(this),
-          onFailure: this._destroyFailure.bind(this)
-        };
-
-        if (ids.length == 1 && curRecords[0].destroyURL) params['url'] = curRecords[0].destroyURL;
-
-        this.request(resource, this._destroyAction, ids, params, this._destroyMethod) ;
+      if (ids.length == 0) {
+        // all records were newRecords
+        this._destroySuccess(null, null, {records: curRecords}) ;
+        continue;
       }
+
+      var params = {
+        requestContext: context,
+        _onSuccess: this._destroySuccess.bind(this),
+        _onFailure: this._destroyFailure.bind(this)
+      };
+
+      if (ids.length == 1 && curRecords[0].destroyURL) params['url'] = curRecords[0].destroyURL;
+
+      this.request(resource, this._destroyAction, ids, params, this._destroyMethod) ;
     }
   },
 
   _destroyAction: 'destroy',
   _destroyMethod: 'post',
 
-  _destroySuccess: function(status, transport, cacheCode, records) {
-    console.log('destroySuccess!') ;
+  _destroySuccess: function(transport, cacheCode, context) {
+    SC.Store.destroyRecords(context.records);
+
+    if (context.onSuccess) context.onSuccess(transport, cacheCode, context.records);
   },
 
-  _destroyFailure: function(status, transport, cacheCode, records) {
+  _destroyFailure: function(transport, cacheCode, context) {
     console.log('destroyFailed!') ;
+    if (context.onFailure) context.onFailure(transport, cacheCode, context.records);
   },
 
   // ..........................................
@@ -564,21 +628,20 @@ SC.Server = SC.Object.extend({
         var recordName = data.type.capitalize() ;
         if (server.prefix) {
           for (var prefixLoc = 0; prefixLoc < server.prefix.length; prefixLoc++) {
-            var prefixParts = server.prefix[prefixLoc].split('.');
-            var namespace = window;
-            for (var prefixPartsLoc = 0; prefixPartsLoc < prefixParts.length; prefixPartsLoc++) {
-              var namespace = namespace[prefixParts[prefixPartsLoc]] ;
-            }
-            if (namespace != window) data.recordType = namespace[recordName] ;
+            path = "%@.%@".format(server.prefix[prefixLoc], recordName) ;
+            data.recordType = SC.Object.objectForPropertyPath(path) ;
             if (data.recordType) break ;
           }
-        } else data.recordType = window[recordName] ;
+        } else data.recordType = SC.Object.objectForPropertyPath(recordName) ;
 
-        if (!data.recordType) console.log('skipping undefined recordType:'+recordName) ;
       } else data.recordType = recordType ;
 
-      if (!data.recordType) return null; // could not process.
-      else return data ;
+      if (!data.recordType) {
+        console.log('skipping undefined recordType:'+recordName) ; 
+        return null; // could not process.
+      }
+      
+      return data ;
     }).compact() ;
 
     // now update.
@@ -587,17 +650,6 @@ SC.Server = SC.Object.extend({
 
   // ................................
   // PRIVATE METHODS
-
-  // places records from array into hash, sorted by resourceURL.
-  _recordsByResource: function(records) {
-    var ret = {} ;
-    records.each(function(rec) {
-      var recs = ret[rec.resourceURL || '*'] || [] ;
-      recs.push(rec)  ;
-      ret[rec.resourceURL || '*'] = recs ;
-    }) ;
-    return ret ;
-  },
 
   _camelizeData: function(data) {
     if (data == null) return data ;
