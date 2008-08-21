@@ -10,10 +10,11 @@ require('server') ;
   @class
   
   Usually you wouldn't need to call any of the methods on this class or it's 
-  superclass, except for calling the +listFor+ method. The other methods are 
-  called for you when you work with your model objects. For example, calling 
-  myObject.commit(); will call the commitRecords method on this server if you 
-  had defined this server to be to the +dataSource+ of myObject.
+  superclass, except for calling the <tt>listFor</tt> method. The other
+  methods are called for you when you work with your model objects. For
+  example, calling <tt>myObject.commit();</tt> will call the
+  <tt>commitRecords</tt> method on thisserver if you had defined this
+  server to be to the <tt>dataSource</tt> of <tt>myObject</tt>.
 
   To have an SC model reflect data on a backend server attach an instance of 
   this class to your application. For example:
@@ -24,9 +25,9 @@ require('server') ;
     }) ;
   }}}
 
-  Then attach that server as the +dataSource+ to each model class that you 
-  want to have reflected. Also define a +resourceURL+ which defines the URL 
-  where the collection of your model can be queried. For example:
+  Then attach that server as the <tt>dataSource</tt> to each model class that
+  you want to have reflected. Also define a <tt>resourceURL</tt> which defines
+  the URL where the collection of your model can be queried. For example:
 
   {{{
     Contacts.Contact = SC.Record.extend(
@@ -42,31 +43,35 @@ require('server') ;
   the call to the backend server and the URL that is being called. The URL is 
   based on the example given above.
 
-      listFor             GET    /sc/contacts
+  <dl>
+    <dt>listFor</dt>
+    <dd>GET /sc/contacts</dd>
+    
+    <dt>createRecords</dt>
+    <dd>POST /sc/contacts</dd>
+    
+    <dt>refreshRecords for one record</dt>
+    <dd>GET /sc/contacts/12345</dd>
+  
+    <dt>refreshRecords for many records</dt>
+    <dd>GET /sc/contacts?ids=1,2,3,4,5,6</dd>
+    
+    <dt>commitRecords for one record</dt>
+    <dd>PUT /sc/contacts/12345</dd>
 
-      createRecords       POST   /sc/contacts
+    <dt>commitRecords for many records</dt>
+    <dd>PUT /sc/contacts?ids=1,2,3,4,5</dd>
+    
+    <dt>destroyRecords for one record</dt>
+    <dd>DELETE /sc/contacts/12345</dd>
+    
+    <dt>destroyRecords for many records</dt>
+    <dd>DELETE /sc/contacts?ids=1,2,3,4,5</dd>
+  </dl>
 
-      refreshRecords
-      for one record      GET    /sc/contacts/12345
-
-      refreshRecords
-      for many records    GET    /sc/contacts?ids=1,2,3,4,5,6
-
-      commitRecords
-      for one record      PUT    /sc/contacts/12345
-
-      commitRecords
-      for many records    PUT    /sc/contacts?ids=1,2,3,4,5
-
-      destroyRecords
-      for one record      DELETE /sc/contacts/12345
-
-      destroyRecords
-      for many records    DELETE /sc/contacts?ids=1,2,3,4,5
-
-  The above is the default behaviour of this server. If you want different 
-  URLs to be generated then extend this class and override the +urlFor+ 
-  method.
+  The above is the default behaviour of this server. If you want different
+  URLs to be generated then extend this class and override the
+  <tt>request</tt> method.
 
   Another way to override the above is to tell SC where member resources can
   be refreshed, committed and destroyed. For example, when SC calls
@@ -97,37 +102,34 @@ require('server') ;
     GET /contacts?refresh=123
   }}}
 
-  instead of GET /contacts/123. Note that this only works for members on your
-  resource. If a collection of contacts needed to be refreshed it would still
-  call for example GET /contacts?id=123,456,789 instead of making 3 separate
-  calls.
+  instead of <tt>GET /contacts/123</tt>. Note that this only works for members
+  on your resource. If a collection of contacts needed to be refreshed it
+  would still call for example <tt>GET /contacts?id=123,456,789</tt> instead
+  of making 3 separate calls.
 
-  Because some browsers cannot actually perform an HTTP PUT or HTTP DELETE it
-  will actually perform an HTTP POST but will put an additional key,value pair
-  in the post data packet. For HTTP PUT it will add _method='put' and for
-  HTTP DELETE it will add _method='delete' in the post data.
-
-  Via the SC.Server#request method you can also call collection and member
-  functions on your resource. Use the +action+ parameter for this. For
-  example, server.request('contacts', 'archive', null, params, 'delete')
+  Via the <tt>SC.Server#request</tt> method you can also call collection and
+  member functions on your resource. Use the <tt>action</tt> parameter for
+  this. For example, 
+  <tt>server.request('contacts', 'archive', null, params, 'delete')</tt>
   would call:
 
   {{{
     DELETE /contacts/archive
   }}}
 
-  And server.request('contacts', 'give', [12345], {'amount': 1000}, 'put')
+  And
+  <tt>server.request('contacts', 'give', [12345], {'amount': 1000}, 'put')</tt>
   would call:
 
   {{{
    PUT /contacts/12345/give
   }}}
   
-  with post data amount=1000.
+  with post data <tt>amount=1000</tt>.
 
-  Alternatively explicitely define the URL to use by setting the +url+
-  property in the +params+ argument that is passed to the server.request 
-  method. For example:
+  Alternatively explicitely define the URL to use by setting the <tt>url</tt>
+  property in the <tt>params</tt> argument that is passed to the 
+  <tt>server.request</tt> method. For example:
 
   {{{
     Contacts.server.request(null,null,null, {url: '/sc/archive'}, 'delete')
@@ -148,13 +150,15 @@ require('server') ;
 SC.RestServer = SC.Server.extend({
 
   /**
-    @see SC.Server.urlFor
+    @see SC.Server.request
   **/
-  urlFor: function(resource, action, ids, params, method) {
+  request: function(resource, action, ids, params, method) {
     url = resource;
     if (ids && ids.length == 1) url = url + '/' + ids[0];
     if (action && action != '') url = url + '/' + action;
-    return url;
+    params.url = url;
+
+    sc_super();
   },
 
 

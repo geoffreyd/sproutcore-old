@@ -53,14 +53,11 @@ require('core') ;
     map.connect 'auth-token.js', :controller => 'application', :action => 'auth_token'
   }}}
 
-  Copy-and-paste the default index template of SproutCore into your own
-  client app. Refer to your new default index template by modifying the
-  :layout option in your sc-config file. Lastly, within this default
-  index template add a line to call auth-token.js on your rails server.
-  For example:
-
+  Lastly, add a reference to the script to the :javascript_libs property
+  in your sc-config file, for example:
+  
   {{{
-    <script src="/sc/auth-token.js" type="text/javascript"></script>
+    c[:javascript_libs] = ['/sc/auth-token.js']
   }}}
 
 
@@ -71,12 +68,22 @@ require('core') ;
 */
 SC.RailsServer = SC.RestServer.extend({
 
-  urlFor: function(resource, action, ids, params, method) {
-    if (method != 'get' && SC.RAILS_AUTH_TOKEN_NAME) {
+  /**
+    Emulates PUT and DELETE requests by sending a POST with _method=put
+    resp. _method=delete in the post body.
+
+    Adds the authenticity token for POST, PUT and DELETE requests.
+
+    @see SC.Server.request
+  **/
+  request: function(resource, action, ids, params, method) {
+    params.emulateUncommonMethods = true;
+
+    if (['post', 'put', 'delete'].include(method) && SC.RAILS_AUTH_TOKEN_NAME) {
       params[SC.RAILS_AUTH_TOKEN_NAME] = SC.RAILS_AUTH_TOKEN;
     }
 
-    return sc_super();
+    sc_super();
   }
 
 }) ;
