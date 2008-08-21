@@ -19,10 +19,11 @@ require('server') ;
    -  listFor: to take an optional argument/setting to uses a named view that will already
       be on couchdb
    -  listFor: take an order option (if possible)
+   -  createRecords: add the id created by couchdb, when it is created
    -  refreshRecords: to use cacheing (when usings a predefined view), to enable less traffic.
    -  commitRecords: 
    -  destroyRecords: 
-   -  requestRecords: clean-up to code that is not used by couchdb
+   -  request: clean-up to code that is not used by couchdb (if any)
 
   @extends SC.RestServer
   @author Geoffrey Donaldson
@@ -182,7 +183,7 @@ SC.CouchdbServer = SC.Server.extend({
         } 
         objects.push(atts);
       }
-      content.docs = objects.toJSONString() ;
+      content.docs = objects ; //.toJSONString() ;
 
       // Fill context, so that _createSuccess will do it's thing
       curRecords.each(function(rec) {
