@@ -19,11 +19,12 @@ require('server') ;
    -  listFor: to take an optional argument/setting to uses a named view that will already
       be on couchdb
    -  listFor: take an order option (if possible)
-   -  createRecords: add the id created by couchdb, when it is created
    -  refreshRecords: to use cacheing (when usings a predefined view), to enable less traffic.
    -  commitRecords: 
    -  destroyRecords: 
-   -  request: clean-up to code that is not used by couchdb (if any)
+   -  requestRecords: clean-up to code that is not used by couchdb
+   -  All: enable use of, limit and offset, so that pagenaion will work
+   -  All: probably merge all common code into 1 function.
 
   @extends SC.RestServer
   @author Geoffrey Donaldson
@@ -52,21 +53,22 @@ SC.CouchdbServer = SC.Server.extend({
       opts.postBody = Object.toJSONString(params.body) ;
     } ; delete params.body ;
 
-    opts.requestHeaders = {'Accept': 'application/json, text/javascript, application/xml, text/xml, text/html, */*'}
+    opts.requestHeaders = params.requestHeaders ; delete params.requestHeaders ;
+    if (!opts.requestHeaders) opts.requestHeaders = {} ;
+    opts.requestHeaders['Accept'] = 'application/json, */*' ;
+    opts.requestHeaders['X-SproutCore-Version'] = SC.VERSION ;
     if (accept) opts.requestHeaders['Accept'] = accept ;
     if (cacheCode) opts.requestHeaders['Sproutit-Cache'] = cacheCode ;
     opts.method = method || 'get' ;
     opts.contentType = "application/json" // this is needed to make couchdb accept our request.
 
     // ids are handeled by the calling methods
-    
-    // adds a custom HTTP header for remote requests
-    opts.requestHeaders = {'X-SproutCore-Version' : '1.0'}
 
     // convert remainging parameters into query string.
     var parameters = this._toQueryString(params) ;
     if (parameters && parameters.length > 0) opts.parameters = parameters ;
     
+    var server = this ;
     var request = null ; //will container the ajax request
     
     // Save callback functions.
@@ -98,11 +100,18 @@ SC.CouchdbServer = SC.Server.extend({
   listFor: function(opts) {
     var recordType = opts.recordType ;
     var resource = recordType.resourceURL() ; if (!resource) return false ;
+    
+    // TODO: check if the user has given a path to a view.
+    // if so, call that view (with Method: GET)
     var url = resource + "/_temp_view"
     var content = {}
 
+    var context = {
+      recordType: recordType
+    }
+
+    // TODO: CouchDB will have to deal with these a little different i think
     params = {} ;
-    // Not really sure if couchdb will use this.
     if (opts.conditions) {
       var conditions = this._decamelizeData(opts.conditions) ;
       for(var key in conditions) {
@@ -118,28 +127,30 @@ SC.CouchdbServer = SC.Server.extend({
     // TODO: check if the user has given a path to a view.
     // if so, call that view (with Method: GET)
 
-    params.requestContext = opts ;
+    params.requestContext = context ;
+    params.url = url ;
     params.body = content ;
     params.onSuccess = this._listSuccess.bind(this) ;
     params.onNotModified = this._listNotModified.bind(this) ;
     params.onFailure = this._listFailure.bind(this) ;
-    params.url = url ;
     this.request(resource, this._listForAction, null, params, this._listForMethod) ;
   },
 
-  _listForAction: 'list',
+  _listForAction: 'list', // We don't acually use this with couchdb
   _listForMethod: 'post', // This is post because we are using _temp_views
 
   _listSuccess: function(status, transport, cacheCode, context) {
     var json = eval('json='+transport.responseText) ;
     if (!json) { console.log('invalid json!'); return; }
 
-    // first lets get the id's and records
+    // Due to the way that couchdb returns data, we need to make our own list of id's,
+    // and build the records from the "value" key of each row.
     ids = []
     records = json.rows.map(function(row) {
       ids.push(row.id) ;
+      console.log("Got Data - "+Object.toJSONString(row.value))
       return row.value ;
-    })
+    }) ;
 
     // then, build any records passed back
     if (records.length > 0) {
@@ -147,7 +158,7 @@ SC.CouchdbServer = SC.Server.extend({
     }
 
     // next, convert the list of ids into records.
-    var recs = (json.ids) ? json.ids.map(function(guid) {
+    var recs = (ids) ? ids.map(function(guid) {
       return SC.Store.getRecordFor(guid,context.recordType) ;
     }) : [] ;
 
@@ -166,52 +177,233 @@ SC.CouchdbServer = SC.Server.extend({
     records = this._recordsByResource(records) ; // sort by resource.
     for(var resource in records) {
       if (resource == '*') continue ;
+      
       var curRecords = records[resource] ;
-      var content = {} ;
-
-      var create_url = resource + "/_bulk_docs"
+      // TODO: possibly change this to work differently with 1 record.
+      // but this works with 
+      var create_url = resource + "/_bulk_docs" ;
 
       // collect data for records
-      var server = this ; var context = {} ;
-      var objects = [];
+      var server = this ; var content = {} ;
+      var objects = []; var recs = [] ;
 
       for (rec in curRecords){
         if (!curRecords.hasOwnProperty(rec)) continue ;
-        atts = curRecords[rec].get('attributes') || {};
-        if (atts.hasOwnProperty('guid')) {
+        if (curRecords[rec].get('attributes')){
+          atts = curRecords[rec].get('attributes');
           atts.type = curRecords[rec]._type._objectClassName ;
-        } 
+          //atts._id = curRecords[rec]._guid ; // we don't want to send an id to start with
+          delete atts.guid ;
+          delete atts.idDirty ; // Not sure what this is or where it comes from
+          recs.push(curRecords[rec]) ;
+        }else{
+          atts = {} ;
+        }
         objects.push(atts);
       }
-      content.docs = objects ; //.toJSONString() ;
-
-      // Fill context, so that _createSuccess will do it's thing
-      curRecords.each(function(rec) {
-        context[rec._guid] = rec ;
-      }) ;
-
-      // issue request
-      this.request(resource, this._createAction, null, {
-        requestContext: context, 
+      content.docs = objects ;// request() will call toJSONString() on this. ;
+      
+      var context = {
+        records: recs
+      } ;
+      
+      var params = {
+        requestContext: context,
         onSuccess: this._createSuccess.bind(this),
         onFailure: this._createFailure.bind(this),
         body: content,
         url: create_url
-      }, this._createMethod) ;
+      };
+
+      // issue request
+      this.request(resource, this._createAction, null, params, this._createMethod) ;
     }
   },
 
   _createAction: 'create',
   _createMethod: 'post', 
+  
+  // This method is called when a create is successful.  It first goes through
+  // and assigns the primaryKey to each record.
+  _createSuccess: function(status, transport, cacheCode, context) {
+    var json = eval('json='+transport.responseText) ;
+    if (!json) { console.log('invalid json!'); return; }
+    
+    // first go through and assign the primaryKey to each record.
+    if (json.new_revs) {
+      // CouchDB will return the documents in the same order you sent them
+      // so here we walk through the returned id's
+      for(i=0; i < json.new_revs.length; i++ ) {
+        data = json.new_revs[i] ;
+        var rec = context.records[i] ;
+        if (rec) {
+          var pk = rec.get('primaryKey') ;
+          var dataKey = (pk == 'guid') ? 'id' : pk.decamelize().toLowerCase().replace(/\-/g,'_') ;
+          rec.set(pk,data[dataKey]) ;
+          rec.set("_id", data.id) ;   // Set couchDB specific 
+          rec.set("_rev", data.rev) ;
+          rec.set('newRecord',false) ;
+        }
+        context.records[i] = rec ;
+      }
+
+      // now this method will work so go do it.
+      this.refreshRecordsWithData(context.records, context.recordType, cacheCode, true) ;
+    }
+
+    if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
+  },
 
   _refreshAction: 'refresh',
   _refreshMethod: 'get',
 
+  // ..........................................
+  // COMMIT
+  // This is mostly just a copy of createRecords, as the process is the same
+  // in couchDB
+
+  commitRecords: function(records) { 
+    if (!records || records.length == 0) return ;
+
+    records = this._recordsByResource(records) ; // sort by resource.
+    for(var resource in records) {
+      if (resource == '*') continue ;
+      
+      var curRecords = records[resource] ;
+      // TODO: possibly change this to work differently with 1 record.
+      // but this works with 
+      var create_url = resource + "/_bulk_docs" ;
+
+      // collect data for records
+      var server = this ; var content = {} ;
+      var objects = []; var recs = [] ;
+
+      for (rec in curRecords){
+        if (!curRecords.hasOwnProperty(rec)) continue ;
+        if (curRecords[rec].get('attributes')){
+          atts = curRecords[rec].get('attributes');
+          atts._id = curRecords[rec].get('guid') ;
+          recs.push(curRecords[rec]) ;
+        }else{
+          atts = {} ;
+        }
+        objects.push(atts);
+      }
+      content.docs = objects ;// request() will call toJSONString() on this. ;
+      
+      if (content.docs.length > 0) {
+        var context = {
+          records: recs
+        } ;
+
+        var params = {
+          requestContext: context,
+          onSuccess: this._commitSuccess.bind(this),
+          onFailure: this._commitFailure.bind(this),
+          body: content,
+          url: create_url
+        };
+
+        // issue request
+        this.request(resource, this._createAction, null, params, this._createMethod) ;
+      }
+    }
+  },
+
   _commitAction: 'save',
-  _commitMethod: 'put',
+  _commitMethod: 'post', // again, this will use couchDB's bulk_docs call, which is post
+  
+  // This method is called when a refresh is successful.  It expects an array
+  // of hashes, which it will convert to records.
+  _commitSuccess: function(status, transport, cacheCode, context) {
+    var json = eval('json='+transport.responseText) ;
+    if (!json) { console.log('invalid json!'); return; }
+    
+    // first go through and assign the primaryKey to each record.
+    if (json.new_revs) {
+      // CouchDB will return the documents in the same order you sent them
+      // so here we walk through the returned id's
+      for(i=0; i < json.new_revs.length; i++ ) {
+        var data = json.new_revs[i] ;
+        var rec = context.records[i] ;
+        if (rec) {
+          var pk = rec.get('primaryKey') ;
+          var dataKey = (pk == 'guid') ? 'id' : pk.decamelize().toLowerCase().replace(/\-/g,'_') ;
+          rec.set(pk,data[dataKey]) ;
+          rec.set("_id", data.id) ;   // Set couchDB specific 
+          rec.set("_rev", data.rev) ;
+          rec.set('newRecord',false) ;
+        }
+        context.records[i] = rec ;
+      }
+
+      // now this method will work so go do it.
+      this.refreshRecordsWithData(context.records, context.recordType, cacheCode, true) ;
+    }
+
+    if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
+  },
+
+  // ..........................................
+  // DESTROY
+  // And once again, this is almost a copy of commit 
+  // ... I wonder if there is a way to make this cleaner
+
+  destroyRecords: function(records) { 
+    if (!records || records.length == 0) return ;
+
+    records = this._recordsByResource(records) ; // sort by resource.
+    for(var resource in records) {
+      if (resource == '*') continue ;
+      
+      var curRecords = records[resource] ;
+      // TODO: possibly change this to work differently with 1 record.
+      // but this works with 
+      var create_url = resource + "/_bulk_docs" ;
+
+      // collect data for records
+      var server = this ; 
+      var objects = []; var content = {} ;
+
+      for (rec in curRecords){
+        if (!curRecords.hasOwnProperty(rec)) continue ;
+        if (curRecords[rec].get('attributes')){
+          atts = curRecords[rec].get('attributes');
+          atts._id = curRecords[rec].get('guid') ;
+          atts._deleted = true ;
+        }else{
+          atts = {} ;
+        }
+        objects.push(atts);
+      }
+      content.docs = objects ;// request() will call toJSONString() on this. ;
+      
+      if (content.docs.length > 0) {
+        var context = {
+          records: curRecords
+        } ;
+
+        var params = {
+          requestContext: context,
+          onSuccess: this._destroySuccess.bind(this),
+          onFailure: this._destroyFailure.bind(this),
+          body: content,
+          url: create_url
+        };
+
+        // issue request
+        this.request(resource, this._createAction, null, params, this._createMethod) ;
+      }
+    }
+  },
 
   _destroyAction: 'destroy',
-  _destroyMethod: 'delete',
+  _destroyMethod: 'post', // We are using post to couchdb's _bulk_doc page.
+  
+  _destroySuccess: function(status, transport, cacheCode, context) {
+    SC.Store.destroyRecords(context.records);
+    console.log('destroySuccess!') ;
+  },
 
   refreshRecordsWithData: function(dataAry,recordType,cacheCode,loaded) {
     var server = this ;
@@ -220,14 +412,17 @@ SC.CouchdbServer = SC.Server.extend({
     dataAry = dataAry.map(function(data) {
 
       // camelize the keys received back.
-      data = server._camelizeData(data) ;
-
+      //data = server._camelizeData(data) ;
+      console.log('Processing Data: '+Object.toJSONString(data)) ;
       // ** Changed **
       // convert the '_id' property to 'guid' to keep the id's that couchdb has given
       if (data._id) { 
         data.guid = data._id; delete data._id; 
       }else if (data.id) {
         data.guid = data.id; delete data.id;
+      }
+      if (data.rev) {
+        data._rev = data.rev; delete data.rev ;
       }
 
       // find the recordType
