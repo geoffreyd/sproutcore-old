@@ -154,7 +154,37 @@ SC.SelectionSupport = {
   hasSelection: function() {
     var sel = this.get('selection') ;
     return sel && (sel.get('length') > 0) ;
-  }.property('selection')
-    
+  }.property('selection'),
+  
+  
+  /**
+    Destroy everything in this selection.
+  */
+  destroySelection: function() {
+    this.beginPropertyChanges() ;
+
+    var self = this ;
+    var selection = this.get("selection") ;
+    resources = selection.byResourceURL() ; // group by resource.
+    for (var resource in resources) {
+      var records = resources[resource] ;
+
+      if (resource == '*') {
+        records.each(function(record) {
+          self.removeAt( self.indexOf(record) ) ;
+        });
+        SC.Store.destroyRecords(records) ;
+      } else {
+        records[0].dataSource.destroyRecords(records,
+          {onSuccess: function(transport, cachecode, destroyedRecords) {
+            destroyedRecords.each(function(record) {
+              self.removeAt( self.indexOf(record) ) ;
+            });
+          }});
+      }
+    }
+
+    this.endPropertyChanges() ;
+  }
 };
 

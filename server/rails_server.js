@@ -71,12 +71,22 @@ require('server/rest_server') ;
 */
 SC.RailsServer = SC.RestServer.extend({
 
-  urlFor: function(resource, action, ids, params, method) {
-    if (method != 'get' && SC.RAILS_AUTH_TOKEN_NAME) {
+  /**
+    Emulates PUT and DELETE requests by sending a POST with _method=put
+    resp. _method=delete in the post body.
+
+    Adds the authenticity token for POST, PUT and DELETE requests.
+
+    @see SC.Server.request
+  **/
+  request: function(resource, action, ids, params, method) {
+    params.emulateUncommonMethods = true;
+
+    if (['post', 'put', 'delete'].include(method) && SC.RAILS_AUTH_TOKEN_NAME) {
       params[SC.RAILS_AUTH_TOKEN_NAME] = SC.RAILS_AUTH_TOKEN;
     }
 
-    return sc_super();
+    sc_super();
   }
 
 }) ;
