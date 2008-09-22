@@ -87,6 +87,7 @@ SC.Collection = SC.Object.extend(
     @type {Array}
   */
   records: function() {
+    if ( !this._isAwake ) this.awake();
     if (this._changedRecords) this._flushChangedRecords() ;
     return this._records ;
   }.property(),
@@ -148,6 +149,11 @@ SC.Collection = SC.Object.extend(
   */
   isDirty: false, // RO
   
+  /**
+    @private
+  */
+  _isAwake: false,
+  
   // ........................................
   // ACTIONS
   //
@@ -157,9 +163,15 @@ SC.Collection = SC.Object.extend(
     right away, depending on the dataSource.
   */
   refresh: function(options) {
+    if (!this._isAwake) this.awake();
+    else this.dataSource.refreshRecords(this.get('records'));
+    return this ;
+  },
+  
+  awake: function(options) {
     var recordType = this.get('recordType') || SC.Record ;
     
-    // start refresh
+    // start awake
     if (!this.dataSource) throw "collection does not have dataSource" ;
     this.beginPropertyChanges();
     if (!this.isLoading) this.set('isLoading',true) ;
@@ -179,7 +191,8 @@ SC.Collection = SC.Object.extend(
     
     this.dataSource.listFor(recordType, options) ;
     this.endPropertyChanges() ;
-    return this; 
+    this._isAwake = true ;
+    return this;
   },
   
   /**

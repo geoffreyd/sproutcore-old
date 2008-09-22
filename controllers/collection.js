@@ -148,6 +148,12 @@ SC.CollectionController = SC.ObjectController.extend(SC.SelectionSupport,
   // you could override it to just do a commit.
   newObjectDidLoseFocus: function(rec) { rec.destroy() ; },
   
+  // Call refresh on the collection:
+  refresh: function() { 
+    var c = this.get('content'); 
+    if (c) return c.refresh(); 
+  },
+  
   // ...................................
   // PRIVATE
   //
