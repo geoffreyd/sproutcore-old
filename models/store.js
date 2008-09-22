@@ -261,10 +261,10 @@ SC.Store = SC.Object.create(
     this._collections[guid] = collections ;
   },
   
-  listFor: function(opts) {
+  listFor: function(recordType, opts) {
     var conditions = opts.conditions || {} ;
     var order = opts.order || ['guid'] ;
-    var records = this.findRecords(conditions,opts.recordType) ;
+    var records = this.findRecords(conditions,recordType) ;
     var count = records.length ;
 
     // sort

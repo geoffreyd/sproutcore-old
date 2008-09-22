@@ -13,20 +13,69 @@ require('server') ;
   
   Working so far:
    -  listFor: will make a temp view to get all documents of the type ie. "Contacts.Contact"
-   -  createRecords: uses the bulk_docs options to make 1 or more documents on the server.
+   -  listFor: will now take a |view| option, to get data from a couchDB view.
+   -  All: uses the bulk_docs options to make/update/delete 1 or more documents on the server.
   
   Todo:
-   -  listFor: to take an optional argument/setting to uses a named view that will already
-      be on couchdb
    -  listFor: take an order option (if possible)
+   -  refreshRecords: Actually write it.
    -  refreshRecords: to use cacheing (when usings a predefined view), to enable less traffic.
-   -  commitRecords: 
-   -  destroyRecords: 
    -  requestRecords: clean-up to code that is not used by couchdb
    -  All: enable use of, limit and offset, so that pagenaion will work
-   -  All: probably merge all common code into 1 function.
+   -  All: probably merge common code.
+   
+   Usage:
+   This version loads documents, creates them, updates them (commit), and 
+   deletes them. (refresh is still coming) 
+   To get it to work, once you have it installed: 
+   
+   1) edit sc-config, and add this as the last line of the fine: 
+   {{{
+     proxy '/data', :to => 'localhost:5984', :url => "/database-name" 
+   }}}
+   '/data' can be whatever you want, this is just the path that SC will 
+   look for your data. 
+   
+   2) Setup the server for your application ie. in core.js: 
+   {{{
+     Contacts = SC.Object.create({ 
+        server: SC.CouchdbServer.create({ prefix: ['Contacts'] }), // This is the important part 
+        FIXTURES: [] 
+      }) ;
+   }}}
+   
+   3) Set the dataSource for your model, and set a 'type' property. ie.: 
+   {{{
+     Contacts.Person = SC.Record.extend( 
+      ** @scope Contacts.Person.prototype * { 
+        dataSource: Contacts.server, 
+        // This is the same as you set in the proxy call (note there is not 
+      slash at the start) 
+        resourceURL: "data", 
+        // Make sure that you have a 'type' property, this is how we will 
+      separate 
+        // your different types of data, and pull them out again. 
+        properties: ['type', 'firstName', 'lastName', 'created', 
+      'modified'], 
+      }) ;
+   }}}
 
-  @extends SC.RestServer
+   4) if you have a view on your couchDB (if you have more than just test data,
+     You really should have views), then call your view with:
+   {{{
+     Contacts.server.listFor(Contacts.Person, {view: "_view/people/by_lastname"}) ;
+   }}}
+
+   5) code like you normally would. This is mostly all there is that is 
+   different to using SC.Server or SC.RestServer. 
+   Of course, this is not finished so there are things that won't work, 
+   like offset, limit and conditions. 
+   Also it is only using couchdb's temp_views at the moment, the next 
+   version will have support for predefined views. 
+   Disclaimer: this is a work in progress, and does not yet support all
+   couchDB functions.
+
+  @extends SC.Server
   @author Geoffrey Donaldson
   @copyright 2006-2008, Sprout Systems, Inc. and contributors.
   @since SproutCore 1.0
@@ -37,120 +86,159 @@ SC.CouchdbServer = SC.Server.extend({
 
     // Get Settings and Options
     if (!params) params = {} ;
-    var opts = {} ;
+    var options = {} ;
+    var _onSuccess = params._onSuccess; delete params._onSuccess;
+    var _onNotModified = params._onNotModified; delete params._onNotModified ;
+    var _onFailure = params._onFailure ; delete params._onFailure ;
     var onSuccess = params.onSuccess; delete params.onSuccess;
-    var onNotModified = params.onNotModified; delete params.onNotModified ;
     var onFailure = params.onFailure ; delete params.onFailure ;
     var context = params.requestContext ; delete params.requestContext ;
     var accept = params.accept ; delete params.accept ;
     var cacheCode = params.cacheCode; delete params.cacheCode ;
     var url = params.url; delete params.url;
-    
+
+    options.emulateUncommonMethods = params.emulateUncommonMethods; delete params.emulateUncommonMethods ;
+
     // If params.body is a string, then add it, else JSONfy it
+    // This allows us to setup the objects in the calling methods, without toJSONing everywhere.
     if (typeof(params.body) == "string"){
-      opts.postBody = params.body ;
+      options.postBody = params.body ;
     }else if(typeof(params.body) == "object"){
-      opts.postBody = Object.toJSONString(params.body) ;
+      options.postBody = Object.toJSONString(params.body) ;
     } ; delete params.body ;
 
-    opts.requestHeaders = params.requestHeaders ; delete params.requestHeaders ;
-    if (!opts.requestHeaders) opts.requestHeaders = {} ;
-    opts.requestHeaders['Accept'] = 'application/json, */*' ;
-    opts.requestHeaders['X-SproutCore-Version'] = SC.VERSION ;
-    if (accept) opts.requestHeaders['Accept'] = accept ;
-    if (cacheCode) opts.requestHeaders['Sproutit-Cache'] = cacheCode ;
-    opts.method = method || 'get' ;
-    opts.contentType = "application/json" // this is needed to make couchdb accept our request.
+    options.requestHeaders = params.requestHeaders ; delete params.requestHeaders ;
+    if (!options.requestHeaders) options.requestHeaders = {} ;
+    options.requestHeaders['Accept'] = 'application/json, */*' ;
+    options.requestHeaders['X-SproutCore-Version'] = SC.VERSION ;
+    if (accept) options.requestHeaders['Accept'] = accept ;
+    if (cacheCode) options.requestHeaders['Sproutit-Cache'] = cacheCode ;
+    options.method = method || 'get' ;
+    options.contentType = "application/json" // this is needed to make couchdb accept our request.
 
     // ids are handeled by the calling methods
 
     // convert remainging parameters into query string.
     var parameters = this._toQueryString(params) ;
-    if (parameters && parameters.length > 0) opts.parameters = parameters ;
-    
-    var server = this ;
-    var request = null ; //will container the ajax request
-    
-    // Save callback functions.
-    opts.onSuccess = function(transport) {
-      var cacheCode = request.getHeader('Last-Modified') ;
-      if ((transport.status == '200') && (transport.responseText == '304 Not Modified')) {
-        if (onNotModified) onNotModified(transport.status, transport, cacheCode,context);
+    if (parameters && parameters.length > 0) {
+      if (!options.emulateUncommonMethods && options.method == 'delete') {
+        // HTTP DELETE doesn't allow a post body; this should actually
+        // be handled by prototype..
+        url += (url.include('?') ? '&' : '?') + parameters;
       } else {
-        if (onSuccess) onSuccess(transport.status, transport, cacheCode,context);
+        options.parameters = parameters;
       }
-    } ;
-    
-    opts.onFailure = function(transport) {
-      var cacheCode = request.getHeader('Last-Modified') ;
-      if (onFailure) onFailure(transport.status, transport, cacheCode,context);
-    } ; 
-    
-    console.log('REQUEST: %@ %@'.fmt(opts.method, url)) ;
-    
-    request = new Ajax.Request(url,opts) ;
-  },
-
-  // I don't think that we need urlFor, as the models will need to specify where to look.
-  
-  // ..........................................
-  // LIST
-  // This is the method called by a collection to get an updated list of
-  // records.
-  listFor: function(opts) {
-    var recordType = opts.recordType ;
-    var resource = recordType.resourceURL() ; if (!resource) return false ;
-    var recordName = recordType.toString()
-    // TODO: check if the user has given a path to a view.
-    // if so, call that view (with Method: GET)
-    var url = resource + "/_temp_view"
-    var content = {}
-
-    recordName = recordName.split('.').last() ;
-
-    var context = {
-      recordType: recordName
     }
 
-    // TODO: CouchDB will have to deal with these a little different i think
+    var server = this ;
+    var request = null ; //will container the ajax request
+
+    // Save callback functions.
+    options.onSuccess = function(transport) {
+      var cacheCode = request.getHeader('Last-Modified') ;
+      var bubble = true;
+      if (onSuccess) bubble = (false != onSuccess(transport, cacheCode, context)) ;
+      if (bubble && server.onSuccess) bubble = (false != server.onSuccess(transport, cacheCode, context));
+      if (bubble) if ((transport.status == '200') && (transport.responseText == '304 Not Modified')) {
+        if (_onNotModified) _onNotModified(transport, cacheCode, context);
+      } else {
+        if (_onSuccess) _onSuccess(transport, cacheCode, context);
+      }
+    } ;
+
+    options.onFailure = function(transport) {
+      var cacheCode = request.getHeader('Last-Modified') ;
+      var bubble = true;
+      if (onFailure) bubble = (false != onFailure(transport, cacheCode, context));
+      if (bubble && server.onFailure) bubble = (false != server.onFailure(transport, cacheCode, context));
+      if (bubble && _onFailure) _onFailure(transport, cacheCode, context);
+    } ;
+
+    console.log('REQUEST: %@ %@'.fmt(options.method, url)) ;
+
+    request = new Ajax.Request(url,options) ;
+  },
+
+  /* ..........................................
+   LIST
+    This is the method called by a collection to get an updated list of
+    records.
+
+    Options that are different from the standard server, are:
+
+    |view|  This is the full path of the view which you want to access
+            View will replace "order".
+
+    |conditions|  should be couchDB query options such as:
+                  "count", "startKey" and "endKey".
+
+  */
+  listFor: function(recordType, options) {
+    var resource = recordType.resourceURL() ;
+    if (!resource) return false ;
+    if (!options) options = {} ;
+
+    var recordName = recordType.toString() ;// TODO: check if this is needed.
+    recordName = recordName.split('.').last() ;
+    var call_action = this._listForAction ;
+    var url = "" ;
+
+    // check if the user has given a path to a view.
+    // if so, call that view (with Method: GET)
+    if (options.view || resource.indexOf("_view") != -1){
+      if (options.view)
+        url = resource + "/" + options.view ;
+      else
+        url = resource ;
+    }else{
+      call_action = 'post' ; // we need to post a temp view
+      url = resource + "/_temp_view" ;
+      var content = {} ;
+      // Here is the couchdb temp view code.
+      content.map = "function(doc) { " +
+        "if (doc.type == \'"+ recordName +"\' ){ "+
+          "emit(doc._id, doc)"+
+      "}}" ;
+    }
+
+    var context = {
+      recordType: recordType,
+      _onSuccess: options._onSuccess,
+      _onFailure: options._onFailure,
+      onSuccess: options.onSuccess,
+      onFailure: options.onFailure
+    } ;
+
     params = {} ;
-    if (opts.conditions) {
-      var conditions = this._decamelizeData(opts.conditions) ;
+    if (options.conditions) {
+      var conditions = this._decamelizeData(options.conditions) ;
       for(var key in conditions) {
         params[key] = conditions[key] ;
       }
     }
 
-    // Here is the couchdb temp view code.
-    content.map = "function(doc) { " +
-      "if (doc.type == \'"+ recordName +"\' ){ "+
-        "emit(doc._id, doc)"+
-    "}}" ;
-    // TODO: check if the user has given a path to a view.
-    // if so, call that view (with Method: GET)
-
     params.requestContext = context ;
+    params._onSuccess = this._listSuccess.bind(this) ;
+    params._onNotModified = this._listNotModified.bind(this) ;
+    params._onFailure = this._listFailure.bind(this) ;
     params.url = url ;
     params.body = content ;
-    params.onSuccess = this._listSuccess.bind(this) ;
-    params.onNotModified = this._listNotModified.bind(this) ;
-    params.onFailure = this._listFailure.bind(this) ;
-    this.request(resource, this._listForAction, null, params, this._listForMethod) ;
+    this.request(resource, call_action, null, params, this._listForMethod) ;
   },
 
   _listForAction: 'list', // We don't acually use this with couchdb
-  _listForMethod: 'post', // This is post because we are using _temp_views
+  _listForMethod: 'get', // This may be post if we are using _temp_views
 
-  _listSuccess: function(status, transport, cacheCode, context) {
+  _listSuccess: function(transport, cacheCode, context) {
     var json = eval('json='+transport.responseText) ;
     if (!json) { console.log('invalid json!'); return; }
 
     // Due to the way that couchdb returns data, we need to make our own list of id's,
     // and build the records from the "value" key of each row.
-    ids = []
-    records = json.rows.map(function(row) {
+    var ids = []
+    var records = json.rows.map(function(row) {
       ids.push(row.id) ;
-      console.log("Got Data - "+Object.toJSONString(row.value))
+      //console.log("Got Data - "+Object.toJSONString(row.value)) // for debuging
       return row.value ;
     }) ;
 
@@ -164,22 +252,25 @@ SC.CouchdbServer = SC.Server.extend({
       return SC.Store.getRecordFor(guid,context.recordType) ;
     }) : [] ;
 
-    // now invoke callback
-    if (context.callback) context.callback(recs,json.count,cacheCode) ;
-  },
+    // invoke internal callback
+    if (context._onSuccess) context._onSuccess(recs, json.count, cacheCode) ;
 
+    // invoke custom user callback
+    if (context.onSuccess) context.onSuccess(transport, cacheCode, recs, json.count) ;
+  },
 
   // ..........................................
   // CREATE
   // send the records back to create them. added a special parameter to
   // the hash for each record, _guid, which will be used onSuccess.
-  createRecords: function(records) { 
+  createRecords: function(records, options) { 
     if (!records || records.length == 0) return ;
+    if (!options) options = {} ;
 
-    records = this._recordsByResource(records) ; // sort by resource.
+    records = records.byResourceURL() ; // group by resource.
     for(var resource in records) {
       if (resource == '*') continue ;
-      
+
       var curRecords = records[resource] ;
       // TODO: possibly change this to work differently with 1 record.
       // but this works with 
@@ -196,7 +287,7 @@ SC.CouchdbServer = SC.Server.extend({
           atts.type = curRecords[rec]._type._objectClassName.split('.').last() ;
           //atts._id = curRecords[rec]._guid ; // we don't want to send an id to start with
           delete atts.guid ;
-          delete atts.idDirty ; // Not sure what this is or where it comes from
+          delete atts.isDirty ; // Not sure what this is or where it comes from
           recs.push(curRecords[rec]) ;
         }else{
           atts = {} ;
@@ -204,15 +295,17 @@ SC.CouchdbServer = SC.Server.extend({
         objects.push(atts);
       }
       content.docs = objects ;// request() will call toJSONString() on this. ;
-      
+
       var context = {
-        records: recs
+        records: recs,
+        onSuccess: options.onSuccess,
+        onFailure: options.onFailure
       } ;
-      
+
       var params = {
         requestContext: context,
-        onSuccess: this._createSuccess.bind(this),
-        onFailure: this._createFailure.bind(this),
+        _onSuccess: this._createSuccess.bind(this),
+        _onFailure: this._createFailure.bind(this),
         body: content,
         url: create_url
       };
@@ -224,15 +317,15 @@ SC.CouchdbServer = SC.Server.extend({
 
   _createAction: 'create',
   _createMethod: 'post', 
-  
+
   // This method is called when a create is successful.  It first goes through
   // and assigns the primaryKey to each record.
-  _createSuccess: function(status, transport, cacheCode, context) {
+  _createSuccess: function(transport, cacheCode, context) {
     var json = eval('json='+transport.responseText) ;
     if (!json) { console.log('invalid json!'); return; }
-    
+
     // first go through and assign the primaryKey to each record.
-    if (json.new_revs) {
+    if (json.new_revs) { // couchDB sends back data in the new_revs property
       // CouchDB will return the documents in the same order you sent them
       // so here we walk through the returned id's
       for(i=0; i < json.new_revs.length; i++ ) {
@@ -243,7 +336,7 @@ SC.CouchdbServer = SC.Server.extend({
           var dataKey = (pk == 'guid') ? 'id' : pk.decamelize().toLowerCase().replace(/\-/g,'_') ;
           rec.set(pk,data[dataKey]) ;
           rec.set("_id", data.id) ;   // Set couchDB specific 
-          rec.set("_rev", data.rev) ;
+          rec.set("_rev", data.rev) ; // Rev is needed to update a record.
           rec.set('newRecord',false) ;
         }
         context.records[i] = rec ;
@@ -256,6 +349,10 @@ SC.CouchdbServer = SC.Server.extend({
     if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
   },
 
+  // ..........................................
+  // REFRESH
+  // TODO: write this!!
+
   _refreshAction: 'refresh',
   _refreshMethod: 'get',
 
@@ -264,13 +361,14 @@ SC.CouchdbServer = SC.Server.extend({
   // This is mostly just a copy of createRecords, as the process is the same
   // in couchDB
 
-  commitRecords: function(records) { 
+  commitRecords: function(records, options) { 
     if (!records || records.length == 0) return ;
+    if (!options) options = {} ;
 
-    records = this._recordsByResource(records) ; // sort by resource.
+    records = records.byResourceURL() ; // sort by resource.
     for(var resource in records) {
       if (resource == '*') continue ;
-      
+
       var curRecords = records[resource] ;
       // TODO: possibly change this to work differently with 1 record.
       // but this works with 
@@ -292,16 +390,18 @@ SC.CouchdbServer = SC.Server.extend({
         objects.push(atts);
       }
       content.docs = objects ;// request() will call toJSONString() on this. ;
-      
+
       if (content.docs.length > 0) {
         var context = {
-          records: recs
+          records: recs,
+          onSuccess: options.onSuccess,
+          onFailure: options.onFailure
         } ;
 
         var params = {
           requestContext: context,
-          onSuccess: this._commitSuccess.bind(this),
-          onFailure: this._commitFailure.bind(this),
+          _onSuccess: this._commitSuccess.bind(this),
+          _onFailure: this._commitFailure.bind(this),
           body: content,
           url: create_url
         };
@@ -314,13 +414,13 @@ SC.CouchdbServer = SC.Server.extend({
 
   _commitAction: 'save',
   _commitMethod: 'post', // again, this will use couchDB's bulk_docs call, which is post
-  
+
   // This method is called when a refresh is successful.  It expects an array
   // of hashes, which it will convert to records.
-  _commitSuccess: function(status, transport, cacheCode, context) {
+  _commitSuccess: function(transport, cacheCode, context) {
     var json = eval('json='+transport.responseText) ;
     if (!json) { console.log('invalid json!'); return; }
-    
+
     // first go through and assign the primaryKey to each record.
     if (json.new_revs) {
       // CouchDB will return the documents in the same order you sent them
@@ -351,21 +451,26 @@ SC.CouchdbServer = SC.Server.extend({
   // And once again, this is almost a copy of commit 
   // ... I wonder if there is a way to make this cleaner
 
-  destroyRecords: function(records) { 
+  destroyRecords: function(records, options) { 
     if (!records || records.length == 0) return ;
+    if (!options) options = {} ;
 
-    records = this._recordsByResource(records) ; // sort by resource.
+    records = records.byResourceURL() ; // sort by resource.
     for(var resource in records) {
-      if (resource == '*') continue ;
-      
       var curRecords = records[resource] ;
+      
+      if (resource == '*') {
+        this._destroySuccess(null, null, {records: curRecords}) ;
+        continue ;
+      }
+
       // TODO: possibly change this to work differently with 1 record.
       // but this works with 
       var create_url = resource + "/_bulk_docs" ;
 
       // collect data for records
-      var server = this ; 
-      var objects = []; var content = {} ;
+      var server = this ; var content = {} ;
+      var objects = []; 
 
       for (rec in curRecords){
         if (!curRecords.hasOwnProperty(rec)) continue ;
@@ -379,44 +484,42 @@ SC.CouchdbServer = SC.Server.extend({
         objects.push(atts);
       }
       content.docs = objects ;// request() will call toJSONString() on this. ;
-      
+
       if (content.docs.length > 0) {
         var context = {
-          records: curRecords
+          records: curRecords,
+          onSuccess: options.onSuccess,
+          onFailure: options.onFailure
         } ;
 
         var params = {
           requestContext: context,
-          onSuccess: this._destroySuccess.bind(this),
-          onFailure: this._destroyFailure.bind(this),
+          _onSuccess: this._destroySuccess.bind(this),
+          _onFailure: this._destroyFailure.bind(this),
           body: content,
           url: create_url
         };
 
         // issue request
-        this.request(resource, this._createAction, null, params, this._createMethod) ;
+        this.request(resource, this._destroyAction, null, params, this._destroyMethod) ;
       }
     }
   },
 
   _destroyAction: 'destroy',
   _destroyMethod: 'post', // We are using post to couchdb's _bulk_doc page.
-  
-  _destroySuccess: function(status, transport, cacheCode, context) {
-    SC.Store.destroyRecords(context.records);
-    console.log('destroySuccess!') ;
-  },
 
+  // ..........................................
+  // SUPPORT
+
+  // This method is called by the various handlers once they have extracted
+  // their data.
   refreshRecordsWithData: function(dataAry,recordType,cacheCode,loaded) {
     var server = this ;
 
     // first, prepare each data item in the Ary.
     dataAry = dataAry.map(function(data) {
 
-      // camelize the keys received back.
-      //data = server._camelizeData(data) ;
-      console.log('Processing Data: '+Object.toJSONString(data)) ;
-      // ** Changed **
       // convert the '_id' property to 'guid' to keep the id's that couchdb has given
       if (data._id) { 
         data.guid = data._id; delete data._id; 
@@ -429,24 +532,22 @@ SC.CouchdbServer = SC.Server.extend({
 
       // find the recordType
       if (data.type) {
-        var recordName = data.type.split(".").last().capitalize() ;
+        var recordName = data.type.capitalize() ;
         if (server.prefix) {
           for (var prefixLoc = 0; prefixLoc < server.prefix.length; prefixLoc++) {
-            var prefixParts = server.prefix[prefixLoc].split('.');
-            var namespace = window;
-            for (var prefixPartsLoc = 0; prefixPartsLoc < prefixParts.length; prefixPartsLoc++) {
-              var namespace = namespace[prefixParts[prefixPartsLoc]] ;
-            }
-            if (namespace != window) data.recordType = namespace[recordName] ;
+            path = "%@.%@".format(server.prefix[prefixLoc], recordName) ;
+            data.recordType = SC.Object.objectForPropertyPath(path) ;
             if (data.recordType) break ;
           }
-        } else data.recordType = window[recordName] ;
-
-        if (!data.recordType) console.log('skipping undefined recordType:'+recordName) ;
+        } else data.recordType = SC.Object.objectForPropertyPath(recordName) ;
       } else data.recordType = recordType ;
 
-      if (!data.recordType) return null; // could not process.
-      else return data ;
+      if (!data.recordType) {
+        console.log('skipping undefined recordType:'+recordName) ;
+        return null; // could not process.
+      }
+        
+      return data ;
     }).compact() ;
 
     // now update.
