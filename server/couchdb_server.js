@@ -78,7 +78,7 @@ require('server') ;
   @extends SC.Server
   @author Geoffrey Donaldson
   @copyright 2006-2008, Sprout Systems, Inc. and contributors.
-  @since SproutCore 1.0
+  @since SproutCore 0.9.18
 */
 SC.CouchdbServer = SC.Server.extend({
   
@@ -351,10 +351,43 @@ SC.CouchdbServer = SC.Server.extend({
 
   // ..........................................
   // REFRESH
-  // TODO: write this!!
+  // WARNING! as couchDB has no way of returning data for many documents,
+  // we have to loop through each record. This will be slow!
+  // Please use listFor, with a view name, to get fast resaults.
+  // This is only good for prototyping, demos or just a handful of documents.
+  refreshRecords: function(records, options) {
+    if (!records || records.length == 0) return ;
+    if (!options) options = {} ;
+    
+    records.each(function(r) {
+      var primaryKey = r.get('primaryKey') ;
+      var context = {
+        recordType: r.recordType, // default record type
+        onSuccess: options.onSuccess,
+        onFailure: options.onFailure
+      };
+      var params = {
+        url: r.get('resourceURL')+"/"+r.get(primaryKey),
+        requestContext: context,
+        _onSuccess: this._refreshSuccess.bind(this),
+        _onFailure: this._refreshFailure.bind(this)
+      };
+      // issue request
+      this.request(resource, this._refreshAction, [r.get(primaryKey)], params, this._refreshMethod) ;
+    });
+    
+  },
 
-  _refreshAction: 'refresh',
+  _refreshAction: '',
   _refreshMethod: 'get',
+  
+  _refreshSuccess: function(transport, cacheCode, context) {
+    var json = eval('json='+transport.responseText) ;
+    if (!json) { console.log('invalid json!'); return; } 
+    var records = [json]
+    if (records) this.refreshRecordsWithData(records, context.recordType, cacheCode, true);
+    if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
+  },
 
   // ..........................................
   // COMMIT
