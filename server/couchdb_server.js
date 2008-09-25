@@ -382,11 +382,22 @@ SC.CouchdbServer = SC.Server.extend({
   _refreshMethod: 'get',
   
   _refreshSuccess: function(transport, cacheCode, context) {
+    
     var json = eval('json='+transport.responseText) ;
-    if (!json) { console.log('invalid json!'); return; } 
+    if (!json) { console.log('invalid json!'); return; }
+
+    // we are only getting one back at a time atm, so stick it in.
+    var ids = [json._id]
     var records = [json]
-    if (records) this.refreshRecordsWithData(records, context.recordType, cacheCode, true);
+
+    // then, build any records passed back
+    if (records.length > 0) {
+      this.refreshRecordsWithData(records,context.recordType,cacheCode,false);
+    }
+
+    // invoke custom user callback
     if (context.onSuccess) context.onSuccess(transport, cacheCode) ;
+    
   },
 
   // ..........................................
