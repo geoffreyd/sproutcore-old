@@ -49,21 +49,21 @@ require('server') ;
      Contacts.Person = SC.Record.extend( 
       ** @scope Contacts.Person.prototype * { 
         dataSource: Contacts.server, 
-        // This is the same as you set in the proxy call (note there is not 
-      slash at the start) 
+        // This is the same as you set in the proxy call (note there is no slash at the start) 
         resourceURL: "data", 
-        // Make sure that you have a 'type' property, this is how we will 
-      separate 
+        // Then add the name of the default view
+        defaultView: "_view/contacts/by_firstname",
+        // Make sure that you have a 'type' property, this is how we will separate 
         // your different types of data, and pull them out again. 
         properties: ['type', 'firstName', 'lastName', 'created', 
       'modified'], 
       }) ;
    }}}
 
-   4) if you have a view on your couchDB (if you have more than just test data,
-     You really should have views), then call your view with:
+   4) if you want to use a different view from the default one, then call listFor with 
+      the 'view' option:
    {{{
-     Contacts.server.listFor(Contacts.Person, {view: "_view/people/by_lastname"}) ;
+     Contacts.server.listFor(Contacts.Person, {view: "_view/contacts/by_lastname"}) ;
    }}}
 
    5) code like you normally would. This is mostly all there is that is 
@@ -185,11 +185,11 @@ SC.CouchdbServer = SC.Server.extend({
 
     // check if the user has given a path to a view.
     // if so, call that view (with Method: GET)
-    if (options.view || resource.indexOf("_view") != -1){
+    if (options.view || recordType.prototype.get("defaultView").indexOf("_view") != -1){
       if (options.view)
         url = resource + "/" + options.view ;
       else
-        url = resource ;
+        url = resource + "/" + recordType.prototype.get("defaultView");
     }else{
       call_action = 'post' ; // we need to post a temp view
       url = resource + "/_temp_view" ;
