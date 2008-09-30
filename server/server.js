@@ -340,6 +340,7 @@ SC.Server = SC.Object.extend({
 
       // collect data for records
       var server = this ; var recs = {} ;
+      var context = {} ;
       var data = curRecords.map(function(rec) {
         var recData = server._decamelizeData(rec.getPropertyData()) ;
         recData._guid = rec._guid ;

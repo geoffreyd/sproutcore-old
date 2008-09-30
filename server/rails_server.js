@@ -67,6 +67,9 @@ require('server/rest_server') ;
   @since SproutCore 1.0
 */
 SC.RailsServer = SC.RestServer.extend({
+  
+  // use this to have an extention added onto the end ie /contacts/1.json
+  useExtenstion: "",
 
   /**
     Emulates PUT and DELETE requests by sending a POST with _method=put
@@ -78,6 +81,11 @@ SC.RailsServer = SC.RestServer.extend({
   **/
   request: function(resource, action, ids, params, method) {
     params.emulateUncommonMethods = true;
+
+    if (this.useExtenstion != "") {
+      params.url = params.url + "." + this.useExtenstion
+    }
+    
 
     if (['post', 'put', 'delete'].include(method) && SC.RAILS_AUTH_TOKEN_NAME) {
       params[SC.RAILS_AUTH_TOKEN_NAME] = SC.RAILS_AUTH_TOKEN;
