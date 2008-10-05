@@ -524,6 +524,11 @@ SC.Server = SC.Object.extend({
 
         if (ids.length == 1 && curRecords[0].updateURL) params['url'] = curRecords[0].updateURL;
 
+        // If asked to send JSON format, turn data into JSON
+        if(this.get('postFormat') == SC.JSON_FORMAT){
+          data = data.toJSONString();
+        }
+
         // issue request
         this.request(resource, this._commitAction, ids, params, this._commitMethod) ;
       }
