@@ -18,8 +18,7 @@ require('server') ;
   
   Todo:
    -  listFor: take an order option (if possible)
-   -  refreshRecords: Actually write it.
-   -  refreshRecords: to use cacheing (when usings a predefined view), to enable less traffic.
+   -  refreshRecords: to use cacheing (when usings a predefined view), to enable less traffic (if possible).
    -  requestRecords: clean-up to code that is not used by couchdb
    -  All: enable use of, limit and offset, so that pagenaion will work
    -  All: probably merge common code.
