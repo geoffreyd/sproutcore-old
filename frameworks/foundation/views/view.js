@@ -1948,7 +1948,7 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
     @test in layoutChildViews
   */
   renderLayout: function(context, firstTime) {
-    console.error('renderLayout is not implemented');
+    context.addStyle(this.get('layoutStyle'));
   }
   
   /** walk like a duck */
