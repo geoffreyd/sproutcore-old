@@ -923,6 +923,9 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
         this.writeStatus(storeKey, K.BUSY_LOADING);
         this.dataHashDidChange(storeKey, rev, YES);
         ret.push(storeKey);
+      
+        // data was added to store, create corresponding record
+        this.materializeRecord(storeKey);
 
       // otherwise, ignore record unless isRefresh is YES.
       } else if (_isRefresh) {
@@ -1034,7 +1037,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
         retCreate= [], retUpdate= [], retDestroy = [], 
         rev       = SC.Store.generateStoreKey(),
         K         = SC.Record,
-        recordType, idx, storeKey, status, key, ret ;
+        recordType, idx, storeKey, status, key, ret, len ;
 
     // If no params are passed, look up storeKeys in the changelog property.
     // Remove any committed records from changelog property.
@@ -1393,6 +1396,10 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
       if(dataHash===undefined) this.writeStatus(storeKey, status) ;
       else this.writeDataHash(storeKey, dataHash, status) ;
       this.dataHashDidChange(storeKey);
+      
+      // data was added to store, create corresponding record
+      this.materializeRecord(storeKey);
+      
       return YES;
     }
     //conflicted (ready)
