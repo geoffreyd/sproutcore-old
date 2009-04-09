@@ -1949,7 +1949,7 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
   */
   renderLayout: function(context, firstTime) {
     context.addStyle(this.get('layoutStyle'));
-  }
+  },
   
   /** walk like a duck */
   isView: YES
