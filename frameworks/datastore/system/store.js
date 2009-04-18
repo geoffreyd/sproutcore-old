@@ -49,6 +49,37 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
   isNested: NO,
   
   // ..........................................................
+  // DATA SOURCE SUPPORT
+  // 
+  
+  /**
+    Convenience method.  Sets the current data source to the passed property.
+    This will also set the store property on the dataSource to the receiver.
+    
+    @returns {SC.Store} receiver
+  */
+  from: function(dataSource) {
+    this.set('dataSource', dataSource);
+    return this ;
+  },
+  
+  /**
+    Convenience method.  Creates a CascadeDataSource with the passed 
+    data source arguments and sets the CascadeDataSource as the data source 
+    for the receiver.
+    
+    @param {SC.DataSource...} dataSource one or more data source arguments
+    @returns {SC.Store} reciever
+  */
+  cascade: function(dataSource) {
+    var dataSources = SC.A(arguments) ;
+    dataSource = SC.CascadeDataSource.create({
+      dataSources: dataSources 
+    });
+    return this.from(dataSource);
+  },
+  
+  // ..........................................................
   // STORE CHAINING
   // 
   
@@ -87,7 +118,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     }
     return this ;
   },
-    
+
   // ..........................................................
   // SHARED DATA STRUCTURES 
   // 
@@ -495,7 +526,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
   find: function(recordType, id) {
     // first attempt to find the record in the local store
     var storeKey = recordType.storeKeyFor(id);
-    if (this.readStatus(storeKey) === SC.RECORD_EMPTY) {
+    if (this.readStatus(storeKey) === SC.Record.EMPTY) {
       storeKey = this.retrieveRecord(recordType, id);
     }
     
@@ -529,7 +560,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {SC.RecordArray} matching set or null if no server handled it
   */
   findAll: function(queryKey, params, _store) { 
-    if (!_store) store = this;
+    if (!_store) _store = this;
 
     var source = this.get('dataSource'), ret, storeKeys, cacheKey ;
     if (source) {
@@ -1103,7 +1134,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
   commitRecord: function(recordType, id, storeKey) {
     var array = this._TMP_RETRIEVE_ARRAY,
         ret ;
-    if (id === undefined) return NO;
+    if (id === undefined && storeKey === undefined ) return NO;
     if (storeKey !== undefined) {
       array[0] = storeKey;
       storeKey = array;
@@ -1321,8 +1352,8 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     } else status = K.READY_CLEAN ;
 
     this.writeStatus(storeKey, status) ;
-    if(dataHash!==undefined) this.writeDataHash(storeKey, dataHash, status) ;
-    if(newId!==undefined) SC.Store.replaceIdFor(storeKey, newId);
+    if (dataHash) this.writeDataHash(storeKey, dataHash, status) ;
+    if (newId) SC.Store.replaceIdFor(storeKey, newId);
     this.dataHashDidChange(storeKey);
     
     return this ;
