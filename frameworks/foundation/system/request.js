@@ -41,8 +41,9 @@ SC.Request = SC.Object.extend({
     return this ;
   },
   
-  send: function() {
+  send: function(body) {
     var request = this ; // SC.clone(this) ;
+    if(body) request.set('body', body) ;
     SC.Request.manager.sendRequest(request) ;
     return request ;
   },
@@ -80,10 +81,28 @@ SC.Request.getUrl = function(address) {
   return req ;
 };
 
-SC.Request.postUrl = function(address) {
+SC.Request.postUrl = function(address, body) {
   var req = SC.Request.create() ;
   req.set('address',address) ;
+  if(body) req.set('body', body) ;
   req.set('type', 'POST') ;
+  
+  return req ;
+};
+
+SC.Request.deleteUrl = function(address) {
+  var req = SC.Request.create() ;
+  req.set('address',address) ;
+  req.set('type', 'DELETE') ;
+  
+  return req ;
+};
+
+SC.Request.putUrl = function(address, body) {
+  var req = SC.Request.create() ;
+  req.set('address',address) ;
+  if(body) req.set('body', body) ;
+  req.set('type', 'PUT') ;
   
   return req ;
 };

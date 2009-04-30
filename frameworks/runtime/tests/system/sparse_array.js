@@ -82,3 +82,41 @@ test("element to be added is at idx > length of array ", function() {
 	ary.replace(2,3,new_numbers,"put the new number overlapping existing numbers ");
 	equals(5, ary.get('length'), "length") ;
 });
+
+
+// ..........................................................
+// TEST SC.ARRAY COMPLIANCE
+// 
+
+var DummyDelegate = SC.Object.extend({
+  content: [], // source array
+
+  sparseArrayDidRequestLength: function(sparseArray) {
+    sparseArray.provideLength(this.content.length);
+  },
+  
+  sparseArrayDidRequestIndex: function(sparseArray, index) {
+    sparseArray.provideObjectAtIndex(index, this.content[index]);
+  },
+  
+  sparseArrayDidRequestIndexOf: function(sparseArray, object) {
+    return this.content.indexOf(object);    
+  },
+  
+  sparseArrayShouldReplace: function(sparseArray, idx, amt, objects) {
+    this.content.replace(idx, amt, objects) ; // keep internal up-to-date
+    return YES ; // allow anything
+  }
+  
+});
+
+SC.ArraySuite.generate("SC.SparseArray", {
+  newObject: function(amt) {
+    if (amt === undefined || typeof amt === SC.T_NUMBER) {
+      amt = this.expected(amt);
+    }
+
+    var del = DummyDelegate.create({ content: amt });
+    return SC.SparseArray.create({ delegate: del });
+  }
+});

@@ -1,4 +1,4 @@
-.sc-menu-item {
+.sc-button-view.sc-menu-item {
   position:relative;
   background-color: #ffffff none repeat scroll 0 0;
   border: none;
@@ -21,6 +21,7 @@
 .sc-menu-item.disabled a{
   color:#A0A0A0;
 }
+
 .sc-menu-item.disabled{
   background-color:#E0E0E0;
   border:none;
@@ -49,7 +50,7 @@
 }
 
 /*for the shortcut keys*/
-.sc-menu-item a span.shortCut {
+.sc-menu-item a span.shortcut {
   position:absolute;
   right:5px;
   margin-right:15px;
@@ -58,7 +59,7 @@
 }
 
 /*Hovering over menu items*/
-.sc-menu-item.sel, 
+.sc-pane.sc-panel > .sc-view.sc-menu-item.focus, 
 .sc-menu-item a:hover {
   background-color: #5A8EC6;
 }

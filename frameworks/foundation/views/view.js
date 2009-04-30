@@ -69,6 +69,12 @@ SC.FULL_HEIGHT = { top: 0, bottom: 0 };
 */
 SC.ANCHOR_CENTER = { centerX: 0, centerY: 0 };
 
+/**
+  Layout property for width, height
+*/
+
+SC.LAYOUT_AUTO = 'auto';
+
 /** @private - custom array used for child views */
 SC.EMPTY_CHILD_VIEWS_ARRAY = [];
 SC.EMPTY_CHILD_VIEWS_ARRAY.needsClone = YES;
@@ -217,6 +223,7 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
     @property {Boolean}
   */
   isVisible: YES,
+  isVisibleBindingDefault: SC.Binding.bool(),
   
   /**
     YES only if the view and all of its parent views are currently visible
@@ -244,7 +251,6 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
   recomputeIsVisibleInWindow: function(parentViewIsVisible) {
     var last = this.get('isVisibleInWindow') ;
     var cur = this.get('isVisible'), parentView ;
-    
     // isVisibleInWindow = isVisible && parentView.isVisibleInWindow
     // this approach only goes up to the parentView if necessary.
     if (cur) {
@@ -445,14 +451,15 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
     
     @returns {SC.View} receiver
   */
-  parentViewDidChange: function() {
+  parentViewDidChange: function() {    
     this.recomputeIsVisibleInWindow() ;
     
     this.set('layerLocationNeedsUpdate', YES) ;
     this.invokeOnce(this.updateLayerLocationIfNeeded) ;
     
     return this ;
-  }.observes('isVisible'),
+  },
+  
   
   // ..........................................................
   // LAYER SUPPORT
@@ -779,13 +786,16 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
   */
   prepareContext: function(context, firstTime) {
     var mixins, len, idx, layerId, bgcolor, cursor ;
-    
     // do some initial setup only needed at create time.
     if (firstTime) {
       // TODO: seems like things will break later if SC.guidFor(this) is used
+      
       layerId = this.layerId ? this.get('layerId') : SC.guidFor(this) ;
       context.id(layerId).classNames(this.get('classNames'), YES) ;
       this.renderLayout(context, firstTime) ;
+    }else{
+      context.resetClassNames();
+      context.classNames(this.get('classNames'), YES);  
     }
     
     // do some standard setup...
@@ -875,6 +885,14 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
   classNames: ['sc-view'],
   
   /**
+    Tool tip property that will be set to the title attribute on the HTML 
+    rendered element.
+    
+    @property {String}
+  */
+  toolTip: null,
+
+  /**
     Determines if the user can select text within the view.  Normally this is
     set to NO to disable text selection.  You should set this to YES if you
     are creating a view that includes editable text.  Otherwise, settings this
@@ -894,7 +912,7 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
     @property {Array}
     @readOnly
   */
-  displayProperties: [],
+  displayProperties: ['isVisible'],
   
   /**
     You can set this to an SC.Cursor instance; it's className will 
@@ -1329,7 +1347,7 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
     // walk up this side
     while (view) {
       f = view.get('frame'); myX += f.x; myY += f.y ;
-      view = view.get('parentView') ; 
+      view = view.get('layoutView') ; 
     }
     
     // walk up other size
@@ -1337,7 +1355,7 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
       view = targetView ;
       while (view) {
         f = view.get('frame'); targetX += f.x; targetY += f.y ;
-        view = view.get('parentView') ; 
+        view = view.get('layoutView') ; 
       }
     }
     
@@ -1417,13 +1435,27 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
   */
   computeFrameWithParentFrame: function(pdim) {
     var layout = this.get('layout') ;
-    var f = {} ;
+    var f = {} , error;
+    var stLayout = this.get('useStaticLayout');
+    
+    if(layout.width !== undefined && layout.width === SC.LAYOUT_AUTO && stLayout!==undefined && !stLayout){
+     error= SC.Error.desc("%@.layout() you cannot use width:auto if staticLayout is disabled".fmt(this),"%@".fmt(this),-1);
+     console.error(error);
+     throw error;
+    }
+
+    if(layout.height !== undefined && layout.height === SC.LAYOUT_AUTO && stLayout!==undefined && !stLayout){
+      error= SC.Error.desc("%@.layout() you cannot use height:auto if staticLayout is disabled".fmt(this),"%@".fmt(this),-1);  
+      console.error(error);
+      throw error;
+    }
     
     // handle left aligned and left/right 
     if (!SC.none(layout.left)) {
       f.x = Math.floor(layout.left) ;
       if (layout.width !== undefined) {
-        f.width = Math.floor(layout.width) ;
+        if(layout.width === SC.LAYOUT_AUTO) f.width = SC.LAYOUT_AUTO ;
+        else f.width = Math.floor(layout.width) ;
       } else { // better have layout.right!
         if (!pdim) pdim = this.computeParentDimensions(layout) ;
         f.width = Math.floor(pdim.width - f.x - (layout.right || 0)) ;
@@ -1436,28 +1468,34 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
         f.width = pdim.width - layout.right ;
         f.x = 0 ;
       } else {
-        f.width = Math.floor(layout.width || 0) ;
+        if(layout.width === SC.LAYOUT_AUTO) f.width = SC.LAYOUT_AUTO ;
+        else f.width = Math.floor(layout.width || 0) ;
         f.x = Math.floor(pdim.width - layout.right - f.width) ;
       }
       
     // handle centered
     } else if (!SC.none(layout.centerX)) {
       if (!pdim) pdim = this.computeParentDimensions(layout) ; 
-      f.width = Math.floor(layout.width || 0) ;
+      if(layout.width === SC.LAYOUT_AUTO) f.width = SC.LAYOUT_AUTO ;
+      else f.width = Math.floor(layout.width || 0) ;
       f.x = Math.floor((pdim.width - f.width)/2 + layout.centerX) ;
     } else {
       f.x = 0 ; // fallback
       if (SC.none(layout.width)) {
         if (!pdim) pdim = this.computeParentDimensions(layout) ;
         f.width = Math.floor(pdim.width) ;
-      } else f.width = layout.width ;
+      } else {
+        if(layout.width === SC.LAYOUT_AUTO) f.width = SC.LAYOUT_AUTO ;
+        else f.width = Math.floor(layout.width || 0) ;
+      }
     }
     
     // handle top aligned and top/bottom 
     if (!SC.none(layout.top)) {
       f.y = Math.floor(layout.top) ;
       if (layout.height !== undefined) {
-        f.height = Math.floor(layout.height) ;
+        if(layout.height === SC.LAYOUT_AUTO) f.height = SC.LAYOUT_AUTO ;
+        else f.height = Math.floor(layout.height) ;
       } else { // better have layout.bottm!
         if (!pdim) pdim = this.computeParentDimensions(layout) ;
         f.height = Math.floor(pdim.height - f.y - (layout.bottom || 0)) ;
@@ -1470,14 +1508,16 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
         f.height = pdim.height - layout.bottom ;
         f.y = 0 ;
       } else {
-        f.height = Math.floor(layout.height || 0) ;
+        if(layout.height === SC.LAYOUT_AUTO) f.height = SC.LAYOUT_AUTO ;
+        else f.height = Math.floor(layout.height || 0) ;
         f.y = Math.floor(pdim.height - layout.bottom - f.height) ;
       }
       
     // handle centered
     } else if (!SC.none(layout.centerY)) {
       if (!pdim) pdim = this.computeParentDimensions(layout) ; 
-      f.height = Math.floor(layout.height || 0) ;
+      if(layout.height === SC.LAYOUT_AUTO) f.height = SC.LAYOUT_AUTO ;
+      else f.height = Math.floor(layout.height || 0) ;
       f.y = Math.floor((pdim.height - f.height)/2 + layout.centerY) ;
       
     // fallback
@@ -1486,7 +1526,10 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
       if (SC.none(layout.height)) {
         if (!pdim) pdim = this.computeParentDimensions(layout) ; 
         f.height = Math.floor(pdim.height) ;
-      } else f.height = layout.height;
+      } else {
+        if(layout.height === SC.LAYOUT_AUTO) f.height = SC.LAYOUT_AUTO ;
+        else f.height = Math.floor(layout.height || 0) ;
+      }
     }
     
     // make sure the width/height fix min/max...
@@ -1678,15 +1721,30 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
     @readOnly
   */
   layoutStyle: function() {
-    var layout = this.get('layout'), ret = {}, pdim = null;
+    var layout = this.get('layout'), ret = {}, pdim = null, error;
+    var stLayout = this.get('useStaticLayout');
     
+    if(layout.width !== undefined && layout.width === SC.LAYOUT_AUTO && stLayout!==undefined && !stLayout){
+     error= SC.Error.desc("%@.layout() you cannot use width:auto if staticLayout is disabled".fmt(this),"%@".fmt(this),-1);
+     console.error(error);
+     throw error;
+    }
+
+    if(layout.height !== undefined && layout.height === SC.LAYOUT_AUTO && stLayout!==undefined && !stLayout){
+      error= SC.Error.desc("%@.layout() you cannot use height:auto if staticLayout is disabled".fmt(this),"%@".fmt(this),-1);  
+      console.error(error);
+      throw error;
+    }
+
+
     // X DIRECTION
     
     // handle left aligned and left/right
     if (!SC.none(layout.left)) {
       ret.left = Math.floor(layout.left);
       if (layout.width !== undefined) {
-        ret.width = Math.floor(layout.width) ;
+        if(layout.width === SC.LAYOUT_AUTO) ret.width = SC.LAYOUT_AUTO ;
+        else ret.width = Math.floor(layout.width) ;
         ret.right = null ;
       } else {
         ret.width = null ;
@@ -1704,7 +1762,8 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
         ret.width = null;
       } else {
         ret.left = null ;
-        ret.width = Math.floor(layout.width || 0) ;
+        if(layout.width === SC.LAYOUT_AUTO) ret.width = SC.LAYOUT_AUTO ;
+        else ret.width = Math.floor(layout.width || 0) ;
       }
       
     // handle centered
@@ -1718,7 +1777,8 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
     } else if (!SC.none(layout.width)) {
       ret.left =  0;
       ret.right = null;
-      ret.width = Math.floor(layout.width);
+      if(layout.width === SC.LAYOUT_AUTO) ret.width = SC.LAYOUT_AUTO ;
+      else ret.width = Math.floor(layout.width);
       ret.marginLeft = 0;
       
     // fallback, full width.
@@ -1728,6 +1788,7 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
       ret.width = null ;
       ret.marginLeft= 0;
     }
+    
     
     // handle min/max
     ret.minWidth = (layout.minWidth === undefined) ? null : layout.minWidth;
@@ -1739,7 +1800,8 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
     if (!SC.none(layout.top)) {
       ret.top = Math.floor(layout.top);
       if (layout.height !== undefined) {
-        ret.height = Math.floor(layout.height) ;
+        if(layout.height === SC.LAYOUT_AUTO) ret.height = SC.LAYOUT_AUTO ;
+        else ret.height = Math.floor(layout.height) ;
         ret.bottom = null ;
       } else {
         ret.height = null ;
@@ -1756,7 +1818,8 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
         ret.height = null ;
       } else {
         ret.top = null ;
-        ret.height = Math.floor(layout.height || 0) ;
+        if(layout.height === SC.LAYOUT_AUTO) ret.height = SC.LAYOUT_AUTO ;
+        else ret.height = Math.floor(layout.height || 0) ;
       }
       
     // handle centered
@@ -1769,7 +1832,8 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
     } else if (!SC.none(layout.height)) {
       ret.top = 0;
       ret.bottom = null;
-      ret.height = Math.floor(layout.height || 0);
+      if(layout.height === SC.LAYOUT_AUTO) ret.height = SC.LAYOUT_AUTO ;
+      else ret.height = Math.floor(layout.height || 0) ;
       ret.marginTop = 0;
       
     // fallback, full width.
@@ -1780,6 +1844,7 @@ SC.View = SC.Object.extend(SC.Responder, SC.DelegateSupport,
       ret.marginTop= 0;
     }
     
+      
     // handle min/max
     ret.minHeight = (layout.minHeight === undefined) ? null : layout.minHeight;
     ret.maxHeight = (layout.maxHeight === undefined) ? null : layout.maxHeight;

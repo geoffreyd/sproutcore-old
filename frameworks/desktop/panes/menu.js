@@ -20,10 +20,12 @@ SC.MenuPane = SC.PickerPane.extend(
   classNames: ['sc-menu'],
 
   tagName: 'div',
+  
+  isModal: YES,
 
   /**
-    The key that explains whether each item is Enabled. If omitted, no icons will
-    be displayed.
+    The key that explains whether each item is Enabled. If omitted, no icons 
+    will be displayed.
 
     @readOnly
     @type Boolean
@@ -73,6 +75,13 @@ SC.MenuPane = SC.PickerPane.extend(
     @type String
   */
   itemWidth: null,
+  
+  /** 
+    The default height for each menu item.
+
+    @type String
+  */
+  itemHeight: 20,
 
   /** 
     The height of the menu and ultimately the menu itself.
@@ -124,7 +133,7 @@ SC.MenuPane = SC.PickerPane.extend(
     @readOnly
     @type String
   */
-  itemBranchKey:null,
+  itemBranchKey: null,
   
   /** 
     The key for setting a branch for the menu item.
@@ -132,7 +141,7 @@ SC.MenuPane = SC.PickerPane.extend(
     @readOnly
     @type String
   */
-  itemShortCutKey:null,
+  itemShortCutKey: null,
   
   /** 
     The key for setting Key Equivalent for the menu item.
@@ -140,7 +149,7 @@ SC.MenuPane = SC.PickerPane.extend(
     @readOnly
     @type String
   */
-  itemKeyEquivalentKey:null,
+  itemKeyEquivalentKey: null,
   
   /** 
     The key for setting Key Equivalent for the menu item.
@@ -148,28 +157,31 @@ SC.MenuPane = SC.PickerPane.extend(
     @readOnly
     @type String
   */
-  itemTargetKey:null,
+  itemTargetKey: null,
   
   /** @private */
   isKeyPane: YES,
 
   /** @private */
-  preferType:SC.PICKER_MENU,
+  preferType: SC.PICKER_MENU,
 
   /**
     Define the current Selected Menu Item.
+
     type SC.MenuItemView
   */
-  currentItemSelected : null,
+  currentSelectedMenuItem : null,
 
   /**
-    The final layout for the inside content View
-    @type Array
+    Define the current Selected Menu Item.
+
+    @type SC.MenuItemView
   */
-  layoutShadow: {},
-  
+  previousSelectedMenuItem : null,
+
   /*
     The anchor for this Menu
+
     @type ButtonView/MenuItemView
   */
   anchor: null,
@@ -177,39 +189,34 @@ SC.MenuPane = SC.PickerPane.extend(
   displayItemsArray: null,
   
   menuItemViews: [],
-  /**
-    This returns whether the anchor for this pane is of MenuItemView type
-    @returns Boolean
-  */
-  isAnchorAMenu: function() {
-    var anchor = this.get('anchor');
-    if(anchor && anchor.kindOf('SC.MenuItemView')) {
-      return YES;
-    }  
-    return NO;
-  },
-    
+
   /**
     Overwrite the popup function of the pickerPane
   */
   popup: function(anchorViewOrElement, preferMatrix) {
-    this.set('anchorElement',anchorViewOrElement.get('layer')) ;
+    var anchor = anchorViewOrElement.isView ? anchorViewOrElement.get('layer') : anchorViewOrElement;
+    this.beginPropertyChanges();
+    this.set('anchorElement',anchor) ;
     this.set('anchor',anchorViewOrElement);
     this.set('preferType',SC.PICKER_MENU) ;
     if(preferMatrix) this.set('preferMatrix',preferMatrix) ;
     this.positionPane() ;
+    this.endPropertyChanges();
     this.append() ;
   },
   
   /**
     This computed property is generated from the items array
+
+    @property
+    @type {String}
   */
   displayItems: function() {
 
     var items = this.get('items') ;
     var loc = this.get('localize') ;
     var keys = null,itemType, cur ;
-    var ret = [] ;
+    var ret = [], rel;
     var max = items.get('length') ;
     var idx, item ;
     var fetchKeys = SC._menu_fetchKeys ;
@@ -220,12 +227,14 @@ SC.MenuPane = SC.PickerPane.extend(
       item = items.objectAt(idx) ;
       if (SC.none(item)) continue ;
       itemType = SC.typeOf(item) ;
+      rel = ret.length;
       if (itemType === SC.T_STRING) {
-        ret[ret.length] = SC.Object.create({ title: item.humanize().titleize(), value: item,
-                            isEnabled: YES, icon: null, isSeparator: null, 
-                            action: null, isCheckbox: NO, menuItemNumber: idx,
-                            isShortCut: NO, isBranch: NO,itemHeight: 20, subMenu: null, 
-                            keyEquivalent: null, target:null });
+        ret[rel] = SC.Object.create({ title: item.humanize().titleize(),   
+	                        value: item, isEnabled: YES, icon: null, 
+	                        isSeparator: null, action: null, isCheckbox: NO, 
+	                        menuItemNumber: idx, isShortCut: NO, isBranch: NO,
+	                        itemHeight: 20, subMenu: null,keyEquivalent: null,
+	                        target:null });
         menuHeight = menuHeight+20 ;
       } else if (itemType !== SC.T_ARRAY) {
           if (keys === null) keys = SC.MENU_ITEM_KEYS.map(fetchKeys, this) ;
@@ -234,17 +243,17 @@ SC.MenuPane = SC.PickerPane.extend(
           if (!keys[0] && item.toString) cur[0] = item.toString() ;
           if (!keys[1]) cur[1] = item ;
           if (!keys[2]) cur[2] = YES ;
-          if (!cur[9]) cur[9] = 20 ;
-          if (cur[4]) cur[9] = 5 ;
+          if (!cur[9]) cur[9] = this.get('itemHeight') ;
+          if (cur[4]) cur[9] = 9 ;
           menuHeight = menuHeight+cur[9] ;
           if (loc && cur[0]) cur[0] = cur[0].loc() ;
-          ret[ret.length] = SC.Object.create({ title: cur[0], value: cur[1],
+          ret[rel] = SC.Object.create({ title: cur[0], value: cur[1],
                                               isEnabled: cur[2], icon: cur[3], 
                                               isSeparator: cur[4], action: cur[5],
                                               isCheckbox: cur[6], isShortCut: cur[7],
                                               menuItemNumber: cur[9], isBranch: cur[8],
                                               itemHeight: cur[9], subMenu: cur[10], 
-                                              keyEquivalent: cur[11], target:cur[12] });                         
+                                              keyEquivalent: cur[11], target:cur[12] }) ;                         
       }
     }
     this.set('menuHeight',menuHeight);
@@ -252,7 +261,9 @@ SC.MenuPane = SC.PickerPane.extend(
     return ret;
   }.property('items').cacheable(),
 
-  /** If the items array itself changes, add/remove observer on item... */
+  /**
+    If the items array itself changes, add/remove observer on item...
+  */
   itemsDidChange: function() {
     if (this._items) {
       this._items.removeObserver('[]', this, this.itemContentDidChange) ;
@@ -285,48 +296,28 @@ SC.MenuPane = SC.PickerPane.extend(
       var bkey = '%@.render'.fmt(this) ;
       SC.Benchmark.start(bkey);
     }
-
     // collect some data 
     var items = this.get('displayItems') ;
-
+    var ret = sc_super();
     // regenerate the buttons only if the new display items differs from the
     // last cached version of it needsFirstDisplay is YES.
 
     var last = this.get('_menu_displayItems') ;
-    var parentView = this.parentView ;
     if (firstTime || (items !== last)) {
       if(!this.get('isEnabled') || !this.get('contentView')) return ;
       var contentView = this.get('contentView');
-      var s = contentView.get('layoutShadow') ;
-      var ss = '' ;
-      for(var key in s) {
-        var value = s[key] ;
-        var menuHeight = this.get('menuHeight');
-        if(key === "height" && menuHeight) value = menuHeight ;
-        if (value !== null) {
-          ss = ss + key +' : ' + value + 'px; ';
-        }
-      }
-      if(ss.length>0) context.push("<div style='position:absolute;"+ss+"'>") ;
+      var menuHeight = this.get('menuHeight');
       this.set('_menu_displayItems',items) ; // save for future
       context.addStyle('text-align', 'center') ;
       var itemWidth = this.get('itemWidth');
       if (SC.none(itemWidth)) {
-        itemWidth = contentView.get('layout').width || itemWidth;
+        itemWidth = this.get('layout').width || 100;
         this.set('itemWidth',itemWidth); 
       }
       this.renderChildren(context,items) ;
-      context.push("<div class='top-left-edge'></div>") ;
-      context.push("<div class='top-edge'></div>") ;
-      context.push("<div class='top-right-edge'></div>") ;
-      context.push("<div class='right-edge'></div>") ;
-      context.push("<div class='bottom-right-edge'></div>") ;
-      context.push("<div class='bottom-edge'></div>") ;
-      context.push("<div class='bottom-left-edge'></div>") ;
-      context.push("<div class='left-edge'></div>") ;
-      context.push("</div>") ;
     }
     if (SC.BENCHMARK_MENU_PANE_RENDER) SC.Benchmark.end(bkey);
+    return ret;
   },
 
   /**
@@ -336,7 +327,7 @@ SC.MenuPane = SC.PickerPane.extend(
     any "transient" states such as the global isEnabled property or selection.
   */
   renderChildren: function(context,items) {
-    if(!this.isEnabled) return ;
+    if(!this.get('isEnabled')) return ;
     var menuItemViews = [];
     var len = items.length ;
     var content = SC.makeArray(items) ;
@@ -353,10 +344,10 @@ SC.MenuPane = SC.PickerPane.extend(
       var isShortCut = item.get('isShortCut') ;
       var isBranch   = item.get('isBranch') ;
       var itemSubMenu = item.get('subMenu') ;
-      var itemHeight = item.get('itemHeight') || 20 ;
+      var itemHeight = item.get('itemHeight') ;
       var itemKeyEquivalent = item.get('keyEquivalent') ;
-      var itemWidth = this.get('itemWidth');
-      var itemTarget = this.get('itemTarget');
+      var itemWidth = this.get('itemWidth') ;
+      var itemTarget = this.get('itemTarget') ;
       var itemView = this.createChildView(
         SC.MenuItemView, {
           owner : itemView,
@@ -400,12 +391,28 @@ SC.MenuPane = SC.PickerPane.extend(
   },
   
   /**
+    Get the current selected Menu item
+    
+    @returns void
+  */
+  currentSelectedMenuItemObserver: function(){
+    var currentSelectedMenuItem = this.get('currentSelectedMenuItem') ;
+    var previousSelectedMenuItem = this.get('previousSelectedMenuItem') ;
+    if(previousSelectedMenuItem){
+      var subMenu = previousSelectedMenuItem.isSubMenuAMenuPane() ;
+      if(subMenu) subMenu.remove() ;
+    }
+    if(currentSelectedMenuItem) currentSelectedMenuItem.becomeFirstResponder() ;
+  }.observes('currentSelectedMenuItem'),
+  
+  /**
     This function returns whether the anchor is of type of MenuItemView
+    
     @returns Boolean
   */
   isAnchorMenuItemType: function() {
-    var anchor = this.get('anchor');
-    return (anchor && anchor.kindOf(SC.MenuItemView));
+    var anchor = this.get('anchor') ;
+    return (anchor && anchor.kindOf(SC.MenuItemView)) ;
   },
   
   //..........................................................
@@ -420,79 +427,140 @@ SC.MenuPane = SC.PickerPane.extend(
     @returns {Boolean}  YES if handled, NO otherwise
   */
   performKeyEquivalent: function(keyString,evt) {
-    if(!this.isEnabled) return YES ;
-    var items = this.get('displayItemsArray');
+    if(!this.get('isEnabled')) return YES ;
+    var items = this.get('displayItemsArray') ;
+    if(!items) return;
     var len = items.length ;
+    var menuItems = this.get('menuItemViews');
     for(var idx=0; idx<len; ++idx) {
-      var item = items[idx];
-      var keyEquivalent = item.get('keyEquivalent');
+      var item = items[idx] ;
+      var keyEquivalent = item.get('keyEquivalent') ;
       var action = item.get('action') ;
       var isEnabled = item.get('isEnabled') ;
-      var target = item.get('itemTarget') || this;
+      var target = item.get('target') || this ;
       if(keyEquivalent == keyString && isEnabled) {
-        return this.performAction(target,action) ;
+        if(menuItems && menuItems[idx]) menuItems[idx].triggerAction(evt);
       }
     }
     return YES ;
   },
   
-  /**
-    Actually fires the action.Pass the target and action to
-    the function.
-
-    @param {Object} target
-    @returns {function,string} action  
+  //Mouse and Key Events
+  
+  /** @private */
+  mouseDown: function(evt) {
+    return YES ;
+  },
+  
+  /** 
+    @private 
+    
+    Get the anchor and send the event to the anchor in case the 
+    current Menu is a subMenu
   */
-  performAction: function(target,action) {
-
-    var typeOfAction = SC.typeOf(action) ;    
-    // if the action is a function, just try to call it.
-    if (typeOfAction == SC.T_FUNCTION) {
-      action.call((target || this), this) ;
-
-    // otherwise, action should be a string.  If it has a period, treat it
-    // like a property path.
-    } else if (typeOfAction === SC.T_STRING) {
-      if (action.indexOf('.') >= 0) {
-
-        var path = action.split('.') ;
-        var property = path.pop() ;
-        var newTarget = SC.objectForPropertyPath(path, window) ;
-        var newAction = target.get ? target.get(property) : target[property] ;
-        if (newAction && SC.typeOf(newAction) == SC.T_FUNCTION) {
-          newAction.call(newTarget, this) ;
-        } else {
-          throw '%@: Menu could not find a function at %@'.fmt(this, this.action) ;
+  mouseUp: function(evt) {
+    this.remove() ;
+    var anchor = this.get('anchor') ;
+    if(this.isAnchorMenuItemType()) this.sendEvent('mouseUp', evt, anchor) ;
+    return YES ;
+  },
+  
+  /** 
+    @private 
+    
+    This function gets called from the Menu Item in order to set the 
+    current Selected Menu Item and move the selection
+  */
+  moveDown: function(menuItem) {
+    var currentSelectedMenuItem = this.getNextEnabledMenuItem(menuItem) ;
+    this.set('currentItemSelected',currentSelectedMenuItem) ;
+    if(menuItem) menuItem.resignFirstResponder() ;
+    currentSelectedMenuItem.becomeFirstResponder() ;
+  },
+  
+  /** 
+    @private 
+    
+    This function gets called from the Menu Item in order to set the 
+    current Selected Menu Item and move the selection
+  */
+  moveUp: function(menuItem) {
+    var currentSelectedMenuItem = this.getPreviousEnabledMenuItem(menuItem) ;
+    this.set('currentItemSelected',currentSelectedMenuItem) ;
+    if(menuItem) menuItem.resignFirstResponder() ;
+    currentSelectedMenuItem.becomeFirstResponder() ;
+    return YES ;
+  },
+  
+  /**
+    Get the previous Enabled Menu Item which is not a separator
+    
+    @returns MenuItemView
+  */
+  getPreviousEnabledMenuItem : function(menuItem) {
+    var menuItemViews = this.get('menuItemViews') ;
+    if(menuItemViews) {
+      var len = menuItemViews.length ;
+      var idx = (menuItemViews.indexOf(menuItem) === -1) ? len : menuItemViews.indexOf(menuItem) ;
+      var isEnabled = NO ;
+      var isSeparator = NO ;
+      while(--idx >= 0 && !isEnabled && !isSeparator) {
+        isEnabled = menuItemViews[idx].get('isEnabled') ;
+        var content = menuItemViews[idx].get('content') ;
+        if(content) {
+          isSeparator = content.get(menuItemViews[idx].get('isSeparatorKey'));
         }
-
-      // otherwise, try to execute action direction on target or send down
-      // responder chain.
-      } else {
-        SC.RootResponder.responder.sendAction(this.action, this.target, this);
       }
+      if(idx === -1) idx = len - 1;
+      return menuItemViews[idx];
+    }
+  },
+
+  /**
+    Get the next Enabled Menu Item which is not a separator
+    
+    @returns MenuItemView
+  */
+  getNextEnabledMenuItem : function(menuItem) {
+    var menuItemViews = this.get('menuItemViews') ;
+    if(menuItemViews) {
+      var len = menuItemViews.length ;
+      var idx = (menuItemViews.indexOf(menuItem) === -1) ? 0 : menuItemViews.indexOf(menuItem) ;
+      var isEnabled = NO ;
+      var isSeparator = NO ;
+      while(!isEnabled && !isSeparator && ++idx < len) {
+        isEnabled = menuItemViews[idx].get('isEnabled') ;
+        var content = menuItemViews[idx].get('content') ;
+        if(content) {
+          isSeparator = content.get(menuItemViews[idx].get('isSeparatorKey'));
+        }
+      }
+      if(idx === len) idx = 0 ;
+      return menuItemViews[idx] ;
     }
   },
   
-  mouseDown: function(evt) {
+  /** 
+    @private - click away picker. 
+    
+    Override to pass the event to the parent Menu
+    in case the current Menu is a subMenu
+    
+    @returns Boolean
+  */
+  modalPaneDidClick: function(evt) {
+    var f = this.get("frame");
+    var currentSelectedMenuItem = this.get('currentSelectedMenuItem');
+    if(currentSelectedMenuItem) {
+      var anchor = currentSelectedMenuItem.getAnchor();
+      if(anchor) {
+        var parentMenu =  anchor.parentMenu();
+        if(parentMenu.kindOf(SC.MenuPane)) parentMenu.modalPaneDidClick(evt);
+      }
+    }
+    if(!this.clickInside(f, evt)) this.remove();
     return YES;
-  },
-  
-  mouseUp: function(evt) {
-    this.remove();
-    var anchor = this.get('anchor');
-    if(this.isAnchorMenuItemType()) this.sendEvent('mouseUp', evt, anchor);
-    return YES;
-  },
-  
-  moveUp: function(childMenu) {
-    //TODO
-  },
-  
-  moveDown: function(childMenu) {
-    //TODO
   }
-  
-  
 });
 
 SC._menu_fetchKeys = function(k) {

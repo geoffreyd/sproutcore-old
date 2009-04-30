@@ -41,7 +41,8 @@ sc_require('views/collection');
   uniform.  This will allow the list view to efficiently render content 
   without worrying about the overall performance.
   
-  Alternatively, you may want to consider overriding the offsetForRowAtContentIndex() and heightForRowAtContentIndex() methods to 
+  Alternatively, you may want to consider overriding the 
+  offsetForRowAtContentIndex() and heightForRowAtContentIndex() methods to 
   perform some faster calculations that do not require inspecting every 
   item in the collection.
   
@@ -62,7 +63,7 @@ SC.ListView = SC.CollectionView.extend(
   /**
     The default layout for the list view simply fills the entire parentView.
   */
-  layout: { left: 0, right: 0, top: 0, height: 100 },
+  layout: { left: 0, right: 0, top: 0, bottom: 0 },
   
   acceptsFirstResponder: YES,
   
@@ -304,7 +305,7 @@ SC.ListView = SC.CollectionView.extend(
       
       // if we're dirty, redraw everything visible
       // (selection changed, content changed, etc.)
-      if (this.get('isDirty')) {
+      if (this.get('isDirty') || firstTime) {
         childSet.length = 0 ; // full render
         
       // else, only redaw objects we haven't previously drawn
@@ -324,7 +325,7 @@ SC.ListView = SC.CollectionView.extend(
         // nope, is the old range inside the new range?
         } else if (range.start <= oldRange.start && range.start + range.length >= oldRange.start + oldRange.length) {
           // need to render two ranges...all pre-existing views are valid
-          context.partialUpdate = YES ;
+          context.updateMode = SC.MODE_APPEND ;
           range2 = { start: oldRange.start + oldRange.length, length: (range.start + range.length) - (oldRange.start + oldRange.length) } ;
           range.length = oldRange.start - range.start ;
         
@@ -358,7 +359,7 @@ SC.ListView = SC.CollectionView.extend(
         
         // nope, is the new range lower than the old range?
         } else if (range.start < oldRange.start) {
-          context.partialUpdate = YES ;
+          context.updateMode = SC.MODE_APPEND ;
         
           // need to remove unused childNodes at the top of the old range
           idx = range.start + range.length ;
@@ -376,7 +377,7 @@ SC.ListView = SC.CollectionView.extend(
         
         // nope, so the new range is higher than the old range
         } else {
-          context.partialUpdate = YES ;
+          context.updateMode = SC.MODE_APPEND ;
         
           // need to remove unused childNodes at the bottom of the old range
           idx = oldRange.start ;

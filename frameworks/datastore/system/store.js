@@ -678,7 +678,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     
     // Next get the storeKey - base on id if available
     storeKey = id ? recordType.storeKeyFor(id) : SC.Store.generateStoreKey();
-
+    
     // now, check the state and do the right thing.
     status = this.readStatus(storeKey);
     
@@ -695,7 +695,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     }
     
     // add dataHash and setup initial status -- also save recordType
-    this.writeDataHash(storeKey, dataHash, K.READY_NEW);
+    this.writeDataHash(storeKey, (dataHash ? dataHash : {}), K.READY_NEW);
     SC.Store.replaceRecordTypeFor(storeKey, recordType);
     this.dataHashDidChange(storeKey);
 
@@ -1432,7 +1432,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
   },
   
   pushDestroy: function(recordType, id, storeKey) {
-    var K = SC.Record;
+    var K = SC.Record, status;
 
     if(storeKey===undefined){
       storeKey = recordType.storeKeyFor(id);
@@ -1449,7 +1449,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
   },
 
   pushError: function(recordType, id, error, storeKey) {
-    var K = SC.Record;
+    var K = SC.Record, status;
 
     if(storeKey===undefined){
       storeKey = recordType.storeKeyFor(id);

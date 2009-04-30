@@ -122,17 +122,48 @@ SC.Array = {
   },
   
   /**
-    Remove an object at the specified index using the replace() primitive method.
+    Remove an object at the specified index using the replace() primitive 
+    method.  You can pass either a single index, a start and a length or an
+    index set.
+    
+    If you pass a single index or a start and length that is beyond the 
+    length this method will throw an SC.OUT_OF_RANGE_EXCEPTION
   
-    @param {Number} idx index of object to remove
+    @param {Number|SC.IndexSet} start index, start of range, or index set
+    @param {Number} length length of passing range
+    @returns {Object} receiver
   */
-  removeAt: function(idx) {
-    if ((idx < 0) || (idx >= this.get('length'))) throw SC.OUT_OF_RANGE_EXCEPTION;
-    var ret = this.objectAt(idx) ;
-    this.replace(idx,1,[]);
-    return ret ;
+  removeAt: function(start, length) {
+
+    var delta = 0, // used to shift range
+        empty = [];
+    
+    if (typeof start === SC.T_NUMBER) {
+
+      if ((start < 0) || (start >= this.get('length'))) {
+        throw SC.OUT_OF_RANGE_EXCEPTION;
+      }
+
+      // fast case
+      if (length === undefined) {
+        this.replace(start,1,empty);
+        return this ;
+      } else {
+        start = SC.IndexSet.create(start, length);
+      }
+    }
+    
+    this.beginPropertyChanges();
+    start.forEachRange(function(start, length) {
+      start -= delta ;
+      delta += length ;
+      this.replace(start, length, empty); // remove!
+    }, this);
+    this.endPropertyChanges();
+    
+    return this ;
   },
-  
+    
   /**
     Search the array of this object, removing any occurrences of it.
     @param {object} obj object to remove
@@ -261,48 +292,121 @@ SC.Array = {
     The callback for a range observer should have the signature:
     
     {{{
-      function rangePropertyDidChange(array, objects, key)
+      function rangePropertyDidChange(array, objects, key, indexes, conext)
     }}}
     
     If the passed key is '[]' it means that the object itself changed.
     
     The return value from this method is an opaque reference to the 
-    ranger observer object.  You can use this reference to destroy the 
+    range observer object.  You can use this reference to destroy the 
     range observer when you are done with it or to update its range.
+    
+    @param {SC.IndexSet} indexes indexes to observe
+    @param {Object} target object to invoke on change
+    @param {String|Function} method the method to invoke
+    @param {Object} context optional context
+    @param {Boolean} isDeep set to YES to observe object properties
+    @returns {SC.RangeObserver} range observer
   */
-  createRangeObserver: function(start, length, target, method) {
+  addRangeObserver: function(indexes, target, method, context, isDeep) {
     var rangeob = this._array_rangeObservers;
-    if (!rangeob) rangeob = this._array_rangeObservers = [] ;
+    if (!rangeob) rangeob = this._array_rangeObservers = SC.Set.create() ;
 
     var C = this.rangeObserverClass ;
-    var ret = C.create(this, start, length, target, method) ;
-    rangeob.push(ret);
-    return ret ;
-  },
-  
-  updateRangeObserver: function(rangeObserver, start, length) {
-    return rangeObserver.update(this, start, length);
-  },
-  
-  destroyRangeObserver: function(rangeObserver) {
-    var ret = rangeObserver.destroy(this);
-    var rangeob = this._array_rangeObservers;
-    if (rangeob) rangeob[rangeob.indexOf(rangeObserver)] = null ; // clear
-    return ret ;
-  },
-  
-  enumerableContentDidChange: function(start, length) {
-    // notify range observers
-    var rangeob = this._array_rangeObservers, len, idx, cur;
-    if (rangeob && (len = rangeob.length)>0) {
-      for(idx=0;idx<len;idx++) { 
-        cur = rangeob[idx];
-        if ((length === undefined) || ((start < (cur.start + cur.length)) && ((start+length) > cur.start))) cur.rangeDidChange();
-      }
+    var ret = C.create(this, indexes, target, method, context, isDeep) ;
+    rangeob.add(ret);
+    
+    // first time a range observer is added, begin observing the [] property
+    if (!this._array_isNotifyingRangeObservers) {
+      this._array_isNotifyingRangeObservers = YES ;
+      this.addObserver('[]', this, this._array_notifyRangeObservers);
     }
     
-    this.notifyPropertyChange('[]') ;
+    return ret ;
+  },
+  
+  /**
+    Moves a range observer so that it observes a new range of objects on the 
+    array.  You must have an existing range observer object from a call to
+    addRangeObserver().
+    
+    The return value should replace the old range observer object that you
+    pass in.
+    
+    @param {SC.RangeObserver} rangeObserver the range observer
+    @param {SC.IndexSet} indexes new indexes to observe
+    @returns {SC.RangeObserver} the range observer (or a new one)
+  */
+  updateRangeObserver: function(rangeObserver, indexes) {
+    return rangeObserver.update(this, indexes);
+  },
+
+  /**
+    Removes a range observer from the receiver.  The range observer must
+    already be active on the array.
+    
+    The return value should replace the old range observer object.  It will
+    usually be null.
+    
+    @param {SC.RangeObserver} rangeObserver the range observer
+    @returns {SC.RangeObserver} updated range observer or null
+  */
+  removeRangeObserver: function(rangeObserver) {
+    var ret = rangeObserver.destroy(this);
+    var rangeob = this._array_rangeObservers;
+    if (rangeob) rangeob.remove(rangeObserver) ; // clear
+    return ret ;
+  },
+
+  /**
+    Updates observers with content change.  To support range observers, 
+    you must pass three change parameters to this method.  Otherwise this
+    method will assume the entire range has changed.
+    
+    This also assumes you have already updated the length property.
+    @param {Number} start the starting index of the change
+    @param {Number} amt the final range of objects changed
+    @param {Number} delta if you added or removed objects, the delta change
+    @returns {SC.Array} receiver
+  */
+  enumerableContentDidChange: function(start, amt, delta) {
+    var rangeob = this._array_rangeObservers, 
+        length, changes ;
+        
+    if (rangeob && rangeob.length>0) {
+      
+      // normalize input parameters
+      if (start === undefined) start = 0;
+      if (delta === undefined) delta = 0 ;
+      if (delta !== 0 || amt === undefined) {
+        length = this.get('length') - start ;
+      } else {
+        length = amt ;
+      }
+      
+      changes = this._array_rangeChanges;
+      if (!changes) changes = this._array_rangeChanges = SC.IndexSet.create();
+      changes.add(start, length);
+    }
+    
+    this.notifyPropertyChange('[]').notifyPropertyChange('length') ;
     return this ;
+  },
+  
+  /** 
+    Observer fires whenever the '[]' property changes.  If there are 
+    range observers, will notify observers of change.
+  */
+  _array_notifyRangeObservers: function() {
+    var rangeob = this._array_rangeObservers,
+        changes = this._array_rangeChanges,
+        len     = rangeob ? rangeob.length : 0, 
+        idx, cur;
+        
+    if (len > 0 && changes && changes.length > 0) {
+      for(idx=0;idx<len;idx++) rangeob[idx].rangeDidChange(changes);
+      changes.clear(); // reset for later notifications
+    }
   }
   
 } ;
@@ -335,19 +439,48 @@ SC.Array.slice = function(beginIndex, endIndex) {
   Returns the index for a particular object in the index.
   
   @param {Object} object the item to search for
+  @param {NUmber} startAt optional starting location to search, default 0
   @returns {Number} index of -1 if not found
 */
-SC.Array.indexOf = function(object) {
+SC.Array.indexOf = function(object, startAt) {
   var idx, len = this.get('length');
-  for(idx=0;idx<len;idx++) {
+  
+  if (startAt === undefined) startAt = 0;
+  else startAt = (startAt < 0) ? Math.ceil(startAt) : Math.floor(startAt);
+  if (startAt < 0) startAt += len;
+  
+  for(idx=startAt;idx<len;idx++) {
     if (this.objectAt(idx) === object) return idx ;
   }
   return -1;
 };
 
 // Some browsers do not support indexOf natively.  Patch if needed
-if (!Array.prototype.indexOf) {
-  Array.prototype.indexOf = SC.Array.indexOf;
+if (!Array.prototype.indexOf) Array.prototype.indexOf = SC.Array.indexOf;
+
+/**
+  Returns the last index for a particular object in the index.
+  
+  @param {Object} object the item to search for
+  @param {NUmber} startAt optional starting location to search, default 0
+  @returns {Number} index of -1 if not found
+*/
+SC.Array.lastIndexOf = function(object, startAt) {
+  var idx, len = this.get('length');
+  
+  if (startAt === undefined) startAt = len-1;
+  else startAt = (startAt < 0) ? Math.ceil(startAt) : Math.floor(startAt);
+  if (startAt < 0) startAt += len;
+  
+  for(idx=startAt;idx>=0;idx--) {
+    if (this.objectAt(idx) === object) return idx ;
+  }
+  return -1;
+};
+
+// Some browsers do not support lastIndexOf natively.  Patch if needed
+if (!Array.prototype.lastIndexOf) {
+  Array.prototype.lastIndexOf = SC.Array.lastIndexOf;
 }
 
 // ......................................................
@@ -371,8 +504,7 @@ if (!Array.prototype.indexOf) {
       // replaced range.  Otherwise, pass the full remaining array length 
       // since everything has shifted
       var len = objects ? (objects.get ? objects.get('length') : objects.length) : 0;
-      if (amt !== len) amt = this.length - idx;
-      this.enumerableContentDidChange(idx, amt) ;
+      this.enumerableContentDidChange(idx, amt, len - amt) ;
       return this ;
     },
   
@@ -384,20 +516,42 @@ if (!Array.prototype.indexOf) {
         ret = (value === undefined) ? this.invoke('get', key) : null ;
       }
       return ret ;
-    },
+    }
+  });
     
-    
-    //indexOf is not implemente in IE for Array
-    indexOf: function(obj) {
-      var len=this.length;
-      for(var i=0; i<len; i++){
-        if(this[i]===obj){
-      	  return i;
-      	}
+  // If browser did not implement indexOf natively, then override with
+  // specialized version
+  var indexOf = Array.prototype.indexOf;
+  if (!indexOf || (indexOf === SC.Array.indexOf)) {
+    Array.prototype.indexOf = function(object, startAt) {
+      var idx, len = this.length;
+
+      if (startAt === undefined) startAt = 0;
+      else startAt = (startAt < 0) ? Math.ceil(startAt) : Math.floor(startAt);
+      if (startAt < 0) startAt += len;
+
+      for(idx=startAt;idx<len;idx++) {
+        if (this[idx] === object) return idx ;
       }
       return -1;
-    }
-  }) ;
+    } ; 
+  }
+  
+  var lastIndexOf = Array.prototype.lastIndexOf ;
+  if (!lastIndexOf || (lastIndexOf === SC.Array.lastIndexOf)) {
+    Array.prototype.lastIndexOf = function(object, startAt) {
+      var idx, len = this.length;
+
+      if (startAt === undefined) startAt = len-1;
+      else startAt = (startAt < 0) ? Math.ceil(startAt) : Math.floor(startAt);
+      if (startAt < 0) startAt += len;
+
+      for(idx=startAt;idx>=0;idx--) {
+        if (this[idx] === object) return idx ;
+      }
+      return -1;
+    };
+  }
   
 })() ;
 

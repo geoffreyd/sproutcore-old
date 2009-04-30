@@ -192,12 +192,15 @@ SC.AlertPane = SC.PanelPane.extend({
     
     @property {SC.ButtonView}
   */
-  buttonThree: SC.outlet('contentView.childViews.2'),
+  buttonThree: SC.outlet('contentView.childViews.2.childViews.0'),
   
+  layout: { centerX: 0, width: 452, top: 100, height: 'auto' },
+
   /** @private - internal view that is actually displayed */
   contentView: SC.View.extend({
-    layout: { centerX: 0, width: 460, top: 100, height: 'auto' },
     
+    layout: { left: 0, right: 0, top: 0, height: "auto" },
+		
     childViews: [
       SC.View.extend(SC.StaticLayout, {
         classNames: ['info'],
@@ -210,19 +213,21 @@ SC.AlertPane = SC.PanelPane.extend({
           context.begin('h1').text(pane.get('message') || '').end();
           context.push(pane.get('displayDescription') || '');
           context.push(pane.get('displayCaption') || '');
-          context.push('<div class="seperator" />');
+          context.push('<div class="seperator"></div>');
         }
       }),
 
       SC.View.extend({
-        layout: { bottom: 14, height: 'auto', right: 18, width: 'auto' },
+        useStaticLayout: YES,
+        layout: { bottom: 13, height: 'auto', right: 18, width: 'auto' },
         childViews: [
           SC.ButtonView.extend({
             useStaticLayout: YES,
             actionKey: SC.BUTTON2_STATUS,
             localize: YES,
             titleMinWidth: 64,
-            layout: { right: 0, height: 'auto', width: 'auto', bottom: 0 },
+            layout: { right: 5, height: 'auto', width: 'auto', bottom: 0 },
+            theme: 'capsule',
             title: "Cancel", 
             action: "dismiss",
             isVisible: NO
@@ -234,19 +239,28 @@ SC.AlertPane = SC.PanelPane.extend({
             localize: YES,
             titleMinWidth: 64,
             layout: { right: 0, height: 'auto', width: 'auto', bottom: 0 },
+            theme: 'capsule',
             title: "OK", 
+            isDefault: YES,
             action: "dismiss"
           })]
       }),
       
-      SC.ButtonView.extend({
-        actionKey: SC.BUTTON3_STATUS,
-        localize: YES,
-        titleMinWidth: 64,
-        layout: { bottom: 14, height: 'auto', left: 18, width: 'auto' },
-        title: "Extra", 
-        action: "dismiss",
-        isVisible: NO
+      SC.View.extend({
+        useStaticLayout: YES,
+        layout: { bottom: 13, height: 'auto', left: 18, width: 'auto' },
+        childViews: [
+          SC.ButtonView.extend({
+            useStaticLayout: YES,
+            actionKey: SC.BUTTON3_STATUS,
+            localize: YES,
+            titleMinWidth: 64,
+            layout: { right: 0, height: 'auto', width: 'auto', bottom: 0 },
+            theme: 'capsule',
+            title: "Extra", 
+            action: "dismiss",
+            isVisible: NO
+          })]
       })]
   }),
 
@@ -327,8 +341,10 @@ SC.AlertPane.show = function(message, description, caption, button1Title, button
     title = args[idx + 3];
     if (title) button.set('title', title).set('isVisible', YES);
   }
-  
-  return ret.append(); // make visible.
+  var show = ret.append() ; // make visible.
+  ret.adjust('height', ret.childViews[0].$().height()) ;
+  ret.updateLayout() ;
+  return show ;
 };
 
 /**

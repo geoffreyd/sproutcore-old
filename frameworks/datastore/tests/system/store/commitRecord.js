@@ -70,12 +70,13 @@ module("SC.Store#commitRecord", {
     store.writeDataHash(storeKey6, json6, SC.Record.READY_ERROR);
     storeKey7 = SC.Store.generateStoreKey();
     store.writeDataHash(storeKey7, json7, SC.Record.READY_DESTROYED_CLEAN);
+
   }
 });
 
 test("Confirm that all the states are switched as expected after running commitRecord", function() {
-  var throwError=false, msg;
-  
+  var throwError=false, msg, status;
+
   store.commitRecord(undefined, undefined, storeKey1);
   status = store.readStatus( storeKey1);
   equals(status, SC.Record.READY_CLEAN, "the status shouldn't have changed. It should be READY_CLEAN ");
@@ -91,8 +92,6 @@ test("Confirm that all the states are switched as expected after running commitR
   store.commitRecord(undefined, undefined, storeKey4);
   status = store.readStatus( storeKey4);
   equals(status, SC.Record.BUSY_DESTROYING, "the status should be SC.Record.BUSY_DESTROYING");
-   
-   
   
   try{
     store.commitRecord(undefined, undefined, storeKey5);

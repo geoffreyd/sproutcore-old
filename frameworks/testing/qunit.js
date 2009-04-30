@@ -260,24 +260,24 @@ $.extend(window, {
 
 $(window).load(function() {
   
-  if ($('#qunit').length === 0) {
-    $('body').append($('<div id="qunit"></div>'));
-  }
-  
-  if($('#userAgent').length == 0) {
-    $('#qunit').append($('<div id="userAgent"></div>'));
-  }
-
-  if ($('#tests').length == 0) {
-    $('#qunit').append($('<ol id="tests"></ol>')) ;
-  }
-  
-	$('#userAgent').html(navigator.userAgent);
-	var head = $('<div class="testrunner-toolbar"><label for="filter">Hide passed tests</label></div>').insertAfter("#userAgent");
-	$('<input type="checkbox" id="filter" />').attr("disabled", true).prependTo(head).click(function() {
-		$('li.pass')[this.checked ? 'hide' : 'show']();
-	});
-	runTest();	
+  //   if ($('#qunit').length === 0) {
+  //     $('body').append($('<div id="qunit"></div>'));
+  //   }
+  //   
+  //   if($('#userAgent').length == 0) {
+  //     $('#qunit').append($('<div id="userAgent"></div>'));
+  //   }
+  // 
+  //   if ($('#tests').length == 0) {
+  //     $('#qunit').append($('<ol id="tests"></ol>')) ;
+  //   }
+  //   
+  // $('#userAgent').html(navigator.userAgent);
+  // var head = $('<div class="testrunner-toolbar"><label for="filter">Hide passed tests</label></div>').insertAfter("#userAgent");
+  // $('<input type="checkbox" id="filter" />').attr("disabled", true).prependTo(head).click(function() {
+  //  $('li.pass')[this.checked ? 'hide' : 'show']();
+  // });
+	//runTest();	
 });
 
 function synchronize(callback) {
@@ -538,12 +538,9 @@ function isSet(a, b, msg) {
 		for ( var i = 0; i < a.length; i++ )
 			if ( a[i] != b[i] )
 				ret = false;
-	} else
-		ret = false;
-	config.assertions.push({
-		result: ret,
-		message: !ret ? (msg + " expected: " + serialArray(b) + " result: " + serialArray(a)) : msg
-	});
+	} else ret = false;
+		
+	window.ok(ret, a, b, msg);
 }
 
 /**
@@ -591,7 +588,18 @@ function t(a,b,c) {
 	var s = "";
 	for ( var i = 0; i < f.length; i++ )
 		s += (s && ",") + '"' + f[i].id + '"';
-	isSet(f, q.apply(q,c), a + " (" + b + ")");
+
+	var a1 = a, b1 = b;
+	var ret = true;
+	
+	a = f ;
+	b = q.apply(q,c);
+	if ( a && b && a.length != undefined && a.length == b.length ) {
+		for ( var i = 0; i < a.length; i++ ) {
+			if ( a[i] != b[i] ) ret = false;
+		}
+	} else ret = false;
+	window.ok(ret, a, b, a1 + " (" + b1 + ")");
 }
 
 /**
