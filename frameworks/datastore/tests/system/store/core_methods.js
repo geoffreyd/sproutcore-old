@@ -37,7 +37,6 @@ module("SC.Store Core Methods", {
 });
 
 test("Verify loadRecords() loads data", function() {
-  
   var dataSource = SC.DataSource.create({});
   var store = SC.Store.create().from(dataSource);
   for(var i in Application.Data) {

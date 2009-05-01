@@ -7,6 +7,7 @@
 
 sc_require('data_sources/data_source');
 sc_require('models/record');
+sc_require('system/query');
 
 /** @class
 
@@ -15,53 +16,93 @@ sc_require('models/record');
   @extends SC.DataSource
   @since SproutCore 1.0
 */
-SC.FixturesDataSource = SC.DataSource.extend( {
+SC.FixturesWithQueriesDataSource = SC.DataSource.extend( {
 
+  // ..........................................................
+  // PREDEFINED EXAMPLE QUERIES
+  //
+  
+  queries: {
+    nameIs: SC.Query.create({queryString: "name = %@"}),
+    countIsLesserThan: SC.Query.create({queryString: "count < %@"})
+  },
+  
+  
   // ..........................................................
   // STANDARD DATA SOURCE METHODS
   // 
   
+  /**
+     Invoked by the store whenever it needs to retrieve an array of records.
+
+     @param {SC.Store} store the requesting store
+     @param {SC.Array} the array with the storeKeys to be retrieved
+     @returns {SC.Bool} return YES because Fixtures supports the function.  
+  */
+  retrieveRecords: function(store, storeKeys) {
+    var len = storeKeys.length, dataHash, storeKey, i;
+    for(i=0; i<len; i++){
+      storeKey = storeKeys[i];
+      dataHash = this.fixtureForStoreKey(store, storeKey);
+      if (dataHash) store.dataSourceDidComplete(storeKey, dataHash);
+    }
+    return YES;    
+  },
 
   /**
-    TODO: revise description 
-    
-    Invoked by the store whenever it needs to load a fresh new batch or records
-    or simply refresh based on their storeKeys. This method is invoked from 
-    the store methods 'findAll' and 'retrieveRecords'. 
-    
-    findAll() will request all records and load them using store.loadRecords(). 
-    retrieveRecords() checks if the record is already loaded and in a clean 
-    state to then just materialize it or if is in an empty state, it will call 
-    this method to load the required record to then materialize it. 
+    Invoked by the store whenever it needs to retrieve an array of storeKeys
+    matching a specific query.  For the fixtures params are ignored and all 
+    storeKeys for the specific recordType are returned.
     
     @param {SC.Store} store the requesting store
-    @param {Object} fetchKey key describing the request, may be SC.Record
+    @param {Object} recordType key describing the request, may be SC.Record
     @param {Hash} params optional additonal fetch params
-    @returns {SC.Array} result set with storeKeys.  
-  */  
-  fetchRecords: function(store, fetchKey, params) {
-    var ret = [], dataHashes, i, storeKey, hashes= [];
+    @returns {SC.Array} result set with storeKeys.  May be sparse.
+  */
+  fetchRecords: function(store, queryKey, params) {
+    var ret = [], dataHashes, i, storeKey, recordType;
+    var query = null;
     
-    if (fetchKey === SC.Record.STORE_KEYS) {
-      params.forEach(function(sk) {
-        var recordType = SC.Store.recordTypeFor(sk),
-            id = store.idFor(sk),
-            hash=this.fixtureForStoreKey(store, sk);
-        ret.push(sk);
-        store.dataSourceDidComplete(sk, hash, id);
-      }, this);
-    } else {
-      if (!(fetchKey === SC.Record || SC.Record.hasSubclass(fetchKey))) {
-        return null ;
-      }
-      dataHashes = this.fixturesFor(fetchKey);
+    if (!params) params = {};
+    
+    if (queryKey === SC.Record || SC.Record.hasSubclass(queryKey)) {
+      // loading by recordType now
+      recordType = queryKey;
+      dataHashes = this.fixturesFor(recordType);
       for(i in dataHashes){
-        storeKey = fetchKey.storeKeyFor(i);
-        hashes.push(dataHashes[i]);
+        storeKey = recordType.storeKeyFor(i);
         ret.push(storeKey);
       }
-      store.loadRecords(fetchKey, hashes);
+    } 
+    else if (typeof queryKey == 'string') {
+      // doing a real query now
+      // first check if this is a known query
+      if (this.queries[queryKey]) query = this.queries[queryKey];
+      // if not, make a new query and remember it
+      else {
+        params.queryString = queryKey;
+        query = this.queries[queryKey] = SC.Query.create(params);
+      }
+      
+      // now lets determine which records to check
+      if (query.recordType)
+        // !!! this doesn't work !!!
+        dataHashes = store.recordsFor(recordType);
+      else
+        // !!! this is a hack - but it works !!!
+        dataHashes = store.dataHashes;
+      
+      // now match the dataHashes against the query
+      for(i in dataHashes){
+        if (query.contains(dataHashes[i],params.parameters)) {
+          //storeKey = recordType.storeKeyFor(i);
+          ret.push(i);
+        }
+      }
     }
+    
+    
+    
     return ret;
   },
   
@@ -194,4 +235,4 @@ SC.FixturesDataSource = SC.DataSource.extend( {
 });
 
 // create default instance for use when configuring
-SC.Record.fixtures = SC.FixturesDataSource.create();
+SC.Record.fixturesWithQueries = SC.FixturesWithQueriesDataSource.create();
