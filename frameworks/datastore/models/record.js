@@ -368,7 +368,7 @@ SC.Record = SC.Object.extend(
   statusString: function() {
     var ret = [], status = this.get('status');
     
-    for(prop in SC.Record) {
+    for(var prop in SC.Record) {
       if(prop.match(/[A-Z_]$/) && SC.Record[prop]===status) {
         ret.push(prop);
       }
@@ -551,7 +551,12 @@ SC.Record.mixin( /** @scope SC.Record */ {
     @returns {SC.RecordArray} result set or null
   */
   findAll: function(store, params) {
-    return store.findAll(this, params);
+    if (params && SC.instanceOf(params, SC.Query)) {
+      params.set('recordType', this);
+      return store.findAll(params);
+    }else{
+      return store.findAll(this, params);
+    }
   }
   
 }) ;
