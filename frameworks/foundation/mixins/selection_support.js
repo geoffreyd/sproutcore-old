@@ -96,7 +96,10 @@ SC.SelectionSupport = {
             
           // fall through for >= 2, only allow if configured for multi-select
           default:
-            if (!this.get('allowsMultipleSelection')) value = null ;
+            if (!this.get('allowsMultipleSelection')) {
+              value = this._scsel_selection || null ;
+              console.log(value);
+            }
             break ;
         }
       } else value = null ;
