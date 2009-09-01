@@ -90,7 +90,7 @@ SC.SelectionSupport = {
             } else value = null ;
             break ;
             
-          // single items are always allows
+          // single items are always allowed
           case 1:
             break ;
             
