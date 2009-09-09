@@ -155,7 +155,7 @@ SC.ListItemView = SC.View.extend(
         del     = this.displayDelegate,
         level   = this.get('outlineLevel'),
         indent  = this.get('outlineIndent'),
-        key, value, working ;
+        key, value, working, hideDisclosure ;
     
     // outline level wrapper
     working = context.begin("div").addClass("sc-outline");
@@ -163,7 +163,8 @@ SC.ListItemView = SC.View.extend(
     
     // handle disclosure triangle
     value = this.get('disclosureState');
-    if (value !== SC.LEAF_NODE) {
+    hideDisclosure = (content.get ? content.get('hideDisclosure') : content['hideDisclosure']) ;
+    if (value !== SC.LEAF_NODE && !hideDisclosure) {
       this.renderDisclosure(working, value);
       context.addClass('has-disclosure');
     }
