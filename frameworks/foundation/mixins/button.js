@@ -139,12 +139,15 @@ SC.Button = {
     if (icon) {
       var blank = static_url('blank');
 
-      image = '<img src="%@1" alt="" class="%@2" />' ;
-      if (icon.indexOf('/') >= 0) {
-        image = image.fmt(icon, 'icon');
-      } else {
-        image = image.fmt(blank, icon);
-      }
+      // image = '<img src="%@1" alt="" class="icon %@2" />' ;
+      // if (icon.indexOf('/') >= 0) {
+      //   image = image.fmt(icon, 'icon');
+      // } else {
+      //   image = image.fmt(blank, icon);
+      // }
+      var url = (icon.indexOf('/')>=0) ? icon : static_url('blank');
+      var className = (url === icon) ? '' : icon ;
+      image = '<img src="%@" alt="" class="icon %@" />'.fmt(url, className) ;
       needsTitle = YES ;
     }
     
