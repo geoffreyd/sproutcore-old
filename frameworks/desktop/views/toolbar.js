@@ -21,20 +21,19 @@
     
     leftView: SC.View.design({
       width: 250, // This is the only layout you need.
-      childViews:[
-        SC.ToolItem.design({
-          icon: 'add_new',
-          target: 'App.itemController',
-          action: 'addItem',
-          title: "New"
-        }),
-        SC.ToolItem.design({
-          icon: 'edit',
-          target: 'App.itemController',
-          action: 'editItem',
-          title: "Edit"
-        })
-      ]
+      childViews: "add edit".w(),
+      add: SC.ToolItem.design({
+        icon: 'add_new',
+        target: 'App.itemController',
+        action: 'addItem',
+        title: "New"
+      }),
+      edit: SC.ToolItem.design({
+        icon: 'edit',
+        target: 'App.itemController',
+        action: 'editItem',
+        title: "Edit"
+      })
     }),
     
     centerView: ...,
