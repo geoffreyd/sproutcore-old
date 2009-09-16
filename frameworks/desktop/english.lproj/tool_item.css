@@ -1,0 +1,19 @@
+/* SC.ToolItemView */
+
+.sc-toolitem-view {
+  padding-top: 0px;
+  font-weight: normal;
+  border: none;
+  width: auto;
+  background-color: transparent;
+}
+.sc-toolitem-view span.sc-button-inner {
+  min-width: 10px !important;
+}
+.sc-toolitem-view img{
+  margin-left: 50%;
+  left: -16px;
+  top: 5px;
+  display: block;
+  padding: 0px !important;
+}
