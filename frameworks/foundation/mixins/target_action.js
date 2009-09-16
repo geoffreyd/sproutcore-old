@@ -93,7 +93,6 @@ SC.TargetAction = {
     On mouse down, set active only if enabled.
   */    
   mouseDown: function(evt) {
-    console.log("moust downed");
     if (!this.get('isEnabled')) return YES ; // handled event, but do nothing
     
     this._actsOnMouseDown = !!this.get('actOnMouseDown') ; // cache
