@@ -83,7 +83,7 @@ SC.SplitView = SC.View.extend(
   
   classNames: ['sc-split-view'],
   
-  childLayoutProperties: 'layoutDirection dividerThickness autoresizeBehavior'.w(),
+  childLayoutProperties: 'layoutDirection dividerThickness autoresizeBehavior topLeftIsCollapsed bottomRightIsCollapsed'.w(),
   
   displayProperties: ['layoutDirection'],
   
@@ -148,7 +148,7 @@ SC.SplitView = SC.View.extend(
   topLeftThickness: function() {
     var view = this.get('topLeftView');
     return view ? this.thicknessForView(view) : 0;
-  }.property('topLeftView').cacheable(),
+  }.property('topLeftView'),
 
   /**
     The current thickness for the bottomRightView
@@ -156,7 +156,7 @@ SC.SplitView = SC.View.extend(
   bottomRightThickness: function() {
     var view = this.get('bottomRightView');
     return view ? this.thicknessForView(view) : 0;
-  }.property('bottomRightView').cacheable(),
+  }.property('bottomRightView'),
   
   /**
     @property {SC.Cursor} the cursor thumb view should use for themselves
@@ -231,7 +231,7 @@ SC.SplitView = SC.View.extend(
     // console.log('bottomRightThickness == %@'.fmt(bottomRightThickness));
     
     // top/left view
-    isCollapsed = topLeftView.get('isCollapsed') || NO ;
+    isCollapsed = this.get('topLeftIsCollapsed') || NO ;
     topLeftView.setIfChanged('isVisible', !isCollapsed) ;
     layout = SC.clone(topLeftView.get('layout'));
     if (direction == SC.LAYOUT_HORIZONTAL) {
@@ -335,7 +335,7 @@ SC.SplitView = SC.View.extend(
     }
     
     // bottom/right view
-    isCollapsed = bottomRightView.get('isCollapsed') || NO ;
+    isCollapsed = this.get('bottomRightIsCollapsed') || NO ;
     bottomRightView.setIfChanged('isVisible', !isCollapsed) ;
     layout = SC.clone(bottomRightView.get('layout'));
     if (direction == SC.LAYOUT_HORIZONTAL) {
@@ -388,7 +388,7 @@ SC.SplitView = SC.View.extend(
   renderLayout: function(context, firstTime) {
     // console.log('%@.renderLayout(%@, %@)'.fmt(this, context, firstTime));
     // console.log('%@.frame = %@'.fmt(this, SC.inspect(this.get('frame'))));
-    if (firstTime) {
+    // if (firstTime) {
       if (!this.get('thumbViewCursor')) {
         this.set('thumbViewCursor', SC.Cursor.create()) ;
       }
@@ -427,7 +427,7 @@ SC.SplitView = SC.View.extend(
       
       // actually set layout for our child views
       this.updateChildLayout() ;
-    }
+    // }
     sc_super() ;
   },
   
@@ -512,10 +512,10 @@ SC.SplitView = SC.View.extend(
     // console.log('%@.mouseDragged(%@, %@)'.fmt(this, evt, thumbView));
     // console.log(evt.originalEvent);
     var view = this._topLeftView ;
-    var isCollapsed = view.get('isCollapsed') || NO ;
+    var isCollapsed = this.get('topLeftIsCollapsed') || NO ;
     if (!isCollapsed && !this.canCollapseView(view)) {
       view = this._bottomRightView ;
-      isCollapsed = view.get('isCollapsed') || NO ;
+      isCollapsed = this.get('bottomRightIsCollapsed') || NO ;
       if (!isCollapsed && !this.canCollapseView(view)) return NO;
     }
     
@@ -531,8 +531,10 @@ SC.SplitView = SC.View.extend(
       }
       
       // if however the splitview decided not to collapse, clear:
-      if (!view.get("isCollapsed")) {
-        this._uncollapsedThickness = null;
+      if (view === this._topLeftView) {
+        if (!this.get('topLeftIsCollapsed')) this._uncollapsedThickness = null;
+      } else {
+        if (!this.get('bottomRightIsCollapsed')) this._uncollapsedThickness = null;
       }
     } else {
       // uncollapse to the last thickness in it's uncollapsed state
@@ -558,8 +560,8 @@ SC.SplitView = SC.View.extend(
     
     var minAvailable = this._dividerThickness ;
     var maxAvailable = 0;
-    if (!topLeftView.get("isCollapsed")) maxAvailable += topLeftViewThickness ;
-    if (!bottomRightView.get("isCollapsed")) maxAvailable += bottomRightViewThickness ;
+    if (!this.get("topLeftIsCollapsed")) maxAvailable += topLeftViewThickness ;
+    if (!this.get("bottomRightIsCollapsed")) maxAvailable += bottomRightViewThickness ;
     
     var proposedThickness = this._topLeftViewThickness + offset;
     var direction = this._layoutDirection ;
@@ -617,8 +619,8 @@ SC.SplitView = SC.View.extend(
       this._desiredTopLeftThickness = thickness ;
       
       // un-collapse if needed.
-      topLeftView.set('isCollapsed', thickness === 0) ;
-      bottomRightView.set('isCollapsed', thickness >= maxAvailable) ;
+      this.set('topLeftIsCollapsed', thickness === 0) ;
+      this.set('bottomRightIsCollapsed', thickness >= maxAvailable) ;
       
       // this.set('displayNeedsUpdate', YES);
       // this.adjustLayout();
@@ -637,9 +639,9 @@ SC.SplitView = SC.View.extend(
     // updates the cursor of the thumb view that called mouseDownInThumbView() to reflect the status of the drag
     var tlThickness = this.thicknessForView(topLeftView) ;
     var brThickness = this.thicknessForView(bottomRightView) ;
-    if (topLeftView.get('isCollapsed') || tlThickness == this.get("topLeftMinThickness") || brThickness == this.get("bottomRightMaxThickness")) {
+    if (this.get('topLeftIsCollapsed') || tlThickness == this.get("topLeftMinThickness") || brThickness == this.get("bottomRightMaxThickness")) {
       thumbViewCursor.set('cursorStyle', this._layoutDirection == SC.LAYOUT_HORIZONTAL ? "e-resize" : "s-resize") ;
-    } else if (bottomRightView.get('isCollapsed') || tlThickness == this.get("topLeftMaxThickness") || brThickness == this.get("bottomRightMinThickness")) {
+    } else if (this.get('bottomRightIsCollapsed') || tlThickness == this.get("topLeftMaxThickness") || brThickness == this.get("bottomRightMinThickness")) {
       thumbViewCursor.set('cursorStyle', this._layoutDirection == SC.LAYOUT_HORIZONTAL ? "w-resize" : "n-resize") ;
     } else {
       thumbViewCursor.set('cursorStyle', this._layoutDirection == SC.LAYOUT_HORIZONTAL ? "ew-resize" : "ns-resize") ;
@@ -679,6 +681,22 @@ SC.SplitView = SC.View.extend(
   splitViewConstrainThickness: function(splitView, view, proposedThickness) {
     // console.log('%@.splitViewConstrainThickness(%@, %@, %@)'.fmt(this, splitView, view, proposedThickness));
     return proposedThickness;
+  },
+  
+  init: function() {
+    sc_super() ;
+    
+    this.layoutView = this ;
+    
+    var ary = this.get('childLayoutProperties') || [], len = ary.length, idx,
+      fun = function() {
+        // this.layoutDidChange() ;
+        // this.displayDidChange() ;
+        this.invokeOnce(this.updateLayout);
+      };
+    for (idx=0; idx<len; ++idx) {
+      this.addObserver(ary[idx], this, fun);
+    }
   }
 
 });

@@ -2174,6 +2174,7 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
     @test in layoutChildViews
   */
   updateLayout: function() {
+    // console.log('%@.updateLayout()'.fmt(this));
     var layer = this.get('layer'), context;
     if (layer) {
       context = this.renderContext(layer);
