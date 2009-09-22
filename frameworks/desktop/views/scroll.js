@@ -609,7 +609,7 @@ SC.ScrollView = SC.View.extend(SC.Border, {
       if (newView) newView.addObserver('frame', this, f);
       
       // replace container
-      this.containerView.set('content', newView);
+      this.containerView.set('contentView', newView);
       
       this.contentViewFrameDidChange();
     }
