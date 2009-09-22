@@ -87,12 +87,10 @@ SC.ToolbarView = SC.View.extend(
       {name: 'centerView', layout: {top:0, bottom: 0, centerX: 0} },
       {name: 'rightView',  layout: {top:0, bottom: 0, right: 0} }
     ] ;
-    console.log(this) ;
     var self = this ;
     // Bonsai.debug['toolbar'] = this ;
     viewLayouts.forEach(function(v) {
       // check to see if this view exists.
-      console.log("Adding SubView "+v.name) ;
       var view = self.get(v.name), width ;
       // Bonsai.debug['view'] = view;
       if (view) {
