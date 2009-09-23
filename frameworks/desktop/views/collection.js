@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -376,6 +376,14 @@ SC.CollectionView = SC.View.extend(
     Enables keyboard-based navigate, deletion, etc. if set to true.
   */
   acceptsFirstResponder: NO,
+  
+  /**
+    Changing this property value by default will cause the CollectionView to
+    add/remove an 'active' class name to the root element.
+    
+    @type Boolean
+  */
+  isActive: NO,
   
   // ..........................................................
   // SUBCLASS METHODS
@@ -1238,6 +1246,8 @@ SC.CollectionView = SC.View.extend(
         cdel    = this.get('contentDelegate'),
         groupIndexes = cdel.contentGroupIndexes(this, content),
         sel;
+        
+    if(!this.get('isSelectable')) return this;
 
     // normalize
     if (SC.typeOf(indexes) === SC.T_NUMBER) {
@@ -1285,6 +1295,7 @@ SC.CollectionView = SC.View.extend(
         content = this.get('content'),
         del     = this.get('selectionDelegate');
         
+    if(!this.get('isSelectable')) return this;
     if (!sel || sel.get('length')===0) return this; // nothing to do
         
     // normalize
@@ -1466,7 +1477,7 @@ SC.CollectionView = SC.View.extend(
   },
   
   /**
-    Select one or more items folling the current selection, optionally
+    Select one or more items following the current selection, optionally
     extending the current selection.  Also scrolls to selected item.
     
     Selection does not wrap around.
@@ -1541,7 +1552,6 @@ SC.CollectionView = SC.View.extend(
     @returns {Boolean} YES if deletion is possible.
   */
   deleteSelection: function() {
-    
     // perform some basic checks...
     if (!this.get('canDeleteContent')) return NO;  
 
@@ -1565,9 +1575,9 @@ SC.CollectionView = SC.View.extend(
     // also, fix up the selection by removing the actual items we removed
     // set selection directly instead of calling select() since we are just
     // fixing up the selection.
-    sel = this.get('selection').copy().remove(content, indexes);
-    this.set('selection', sel.freeze());
     
+    this.selectPreviousItem(false, 1) ;
+
     return YES ;
   },
   
@@ -1918,9 +1928,8 @@ SC.CollectionView = SC.View.extend(
     
     var view   = this.itemViewForEvent(ev),
         info   = this.mouseDownInfo,
-        idx    = info.contentIndex,
-        contentIndex, sel, isSelected, canEdit, itemView, content;
-    
+        contentIndex, sel, isSelected, canEdit, itemView, content, idx;
+        
     if (this.get('useToggleSelection')) {
       if (!view) return ; // do nothing when clicked outside of elements
       
@@ -1932,7 +1941,8 @@ SC.CollectionView = SC.View.extend(
       if (isSelected) this.deselect(contentIndex) ;
       else this.select(contentIndex, YES) ;
       
-    } else {
+    } else if(info) {
+      idx = info.contentIndex;
       contentIndex = (view) ? view.get('contentIndex') : -1 ;
       
       // this will be set if the user simply clicked on an unselected item and 
@@ -1970,8 +1980,11 @@ SC.CollectionView = SC.View.extend(
           canEdit = (canEdit && itemView.beginEditing) ? itemView.beginEditing() : NO ;
         }
         
-        // if cannot edit, just reselect
-        if (!canEdit) this.select(idx, false) ;
+        // if cannot edit, schedule a reselect (but give doubleClick a chance)
+        if (!canEdit) {
+          if (this._cv_reselectTimer) this._cv_reselectTimer.invalidate() ;
+          this._cv_reselectTimer = this.invokeLater(this.select, 300, idx, false) ;
+        }
       }
       
       this._cleanupMouseDown() ;
@@ -2168,12 +2181,16 @@ SC.CollectionView = SC.View.extend(
         dragView = del.collectionViewDragViewFor(this, dragContent.indexes);
         if (!dragView) dragView = this._cv_dragViewFor(dragContent.indexes);
         
+        // Make sure the dragView has created its layer.
+        dragView.createLayer();
+        
         // Initiate the drag
         SC.Drag.start({
           event: info.event,
           source: this,
           dragView: dragView,
           ghost: NO,
+          ghostActsLikeCursor: del.ghostActsLikeCursor,
           slideBack: YES,
           dataSource: this
         }); 
@@ -2721,6 +2738,7 @@ SC.CollectionView = SC.View.extend(
     if (delay === undefined) delay = 0 ;
     if (clickCount === undefined) clickCount = 1;
     if ((clickCount>1) || this.get('actOnSelect')) {
+      if (this._cv_reselectTimer) this._cv_reselectTimer.invalidate() ;
       sel = this.get('selection');
       sel = sel ? sel.toArray() : [];
       if (this._cv_actionTimer) this._cv_actionTimer.invalidate();

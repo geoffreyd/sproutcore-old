@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 /** @class
@@ -10,7 +10,8 @@
   the iFrame should be from the same domain. (i.e. the src / value should be 
   from the same domain) if you want to access the contents of the iframe.
 
-  @extends SC.View, SC.Control
+  @extends SC.View
+  @extends SC.Control
   @since SproutCore 1.0
 */
 SC.WebView = SC.View.extend(SC.Control, {

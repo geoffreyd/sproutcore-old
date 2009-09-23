@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            portions copyright @2009 Apple, Inc.
+//            portions copyright @2009 Apple Inc.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -22,7 +22,6 @@ SC.LIST_ITEM_ACTION_EJECT = 'sc-list-item-cancel-eject';
   
   @extends SC.View
   @extends SC.Control
-  @extends SC.InlineEditorDelegate
   @extends SC.Editable
   @extends SC.StaticLayout
   @since SproutCore 1.0
@@ -30,7 +29,6 @@ SC.LIST_ITEM_ACTION_EJECT = 'sc-list-item-cancel-eject';
 SC.ListItemView = SC.View.extend(
     SC.StaticLayout,
     SC.Control,
-    SC.InlineEditorDelegate,
 /** @scope SC.ListItemView.prototype */ {
   
   classNames: ['sc-list-item-view'],
@@ -408,7 +406,7 @@ SC.ListItemView = SC.View.extend(
     occurred inside of it.
   */
   _isInsideDisclosure: function(evt) {
-    if (this.get('disclosureSate')===SC.LEAF_NODE) return NO;
+    if (this.get('disclosureState')===SC.LEAF_NODE) return NO;
     return this._isInsideElementWithClassName('disclosure', evt);
   },
   
@@ -572,7 +570,6 @@ SC.ListItemView = SC.View.extend(
    var f= this.computeFrameWithParentFrame(null);
    var parent = this.get('parentView');
    var pf = parent.get('frame');
-   
    var el = this.$label() ;
    var offset = SC.viewportOffset(el[0]);
    if (!el || el.get('length')===0) return NO ;
@@ -582,7 +579,7 @@ SC.ListItemView = SC.View.extend(
    var oldLineHeight = el.css('lineHeight');
    var fontSize = el.css('fontSize');
    var top = this.$().css('top');
-   if(top) top = parseInt(top.substring(0,top.length-2),00);
+   if(top) top = parseInt(top.substring(0,top.length-2),0);
    else top =0;
    var lineHeight = oldLineHeight;
    var lineHeightShift = 0;
@@ -598,7 +595,7 @@ SC.ListItemView = SC.View.extend(
    f.x = offset.x;
    f.y = offset.y+top + lineHeightShift ;
    f.height = el[0].offsetHeight ;
-   f.width = (f.width - 30 - el[0].offsetLeft) ;
+   f.width = (f.width - 40 - el[0].offsetLeft) ;
    
    var ret = SC.InlineTextFieldView.beginEditing({
      frame: f, 

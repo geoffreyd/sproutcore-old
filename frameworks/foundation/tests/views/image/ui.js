@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            portions copyright @2009 Apple, Inc.
+//            portions copyright @2009 Apple Inc.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -9,7 +9,7 @@
 
 htmlbody('<style> .sc-static-layout { border: 1px red dotted; } </style>');
 (function() {
-  var appleURL='http://weblogs.baltimoresun.com/business/consuminginterests/blog/apple-logo1.jpg';
+  var appleURL='http://photos4.meetupstatic.com/photos/event/4/6/9/9/600_4518073.jpeg';
 
   var pane = SC.ControlTestPane.design()
     .add("image_not_loaded", SC.ImageView, { 
@@ -33,6 +33,19 @@ htmlbody('<style> .sc-static-layout { border: 1px red dotted; } </style>');
     test("Verify that all the rendering properties of an image that is loaded are correct", function() {
       ok(pane.view('image_loaded').get('isVisibleInWindow'), 'image_loaded is visible in window');
       equals(pane.view('image_loaded').$().attr('src'), appleURL, "should be the same url");    
+    });
+    
+    test("Verify that the tooltip is correctly being set as both the title and attribute (disabling localization for this test)", function() {
+      var imageView = pane.view('image_loaded');
+      var testToolTip = 'This is a test tooltip';
+      
+      SC.RunLoop.begin();
+      imageView.set('localization', NO);
+      imageView.set('toolTip', testToolTip);
+      SC.RunLoop.end();
+      
+      ok((imageView.$().attr('title') === testToolTip), "The title attribute should be set to \"" + testToolTip + "\"");
+      ok((imageView.$().attr('alt') === testToolTip), "The alt attribute should be set to \"" + testToolTip + "\"");
     });
     
 })();

@@ -1,7 +1,7 @@
 // ========================================================================
 // SproutCore -- JavaScript Application Framework
 // Copyright ©2006-2008, Sprout Systems, Inc. and contributors.
-// Portions copyright ©2008 Apple, Inc.  All rights reserved.
+// Portions copyright ©2008 Apple Inc.  All rights reserved.
 // ========================================================================
 
 SC.DRAG_LINK = 0x0004; SC.DRAG_COPY = 0x0001; SC.DRAG_MOVE = 0x0002;
@@ -76,6 +76,15 @@ SC.Drag = SC.Object.extend(
     @type SC.View
   */
   ghostView: null,
+  
+  /**
+    If YES, then the ghostView will acts like a cursor and attach directly
+    to the mouse location.
+    
+    @readOnly
+    @type Boolean
+  */
+  ghostActsLikeCursor: NO,
   
   /**  
     The view that was used as the source of the ghostView.  
@@ -298,12 +307,11 @@ SC.Drag = SC.Object.extend(
     
     var origin = f;//pv.convertFrameToView(dv.get('frame'), null) ;
     
-    this.ghostOffset = { x: (loc.x-origin.x), y: (loc.y-origin.y) } ;
-    
-    this.mouseGhostOffset = {x: (loc.x - dvf.x), y: (loc.y - dvf.y)};
+    if (this.ghostActsLikeCursor) this.ghostOffset = { x: 14, y: 14 };
+    else this.ghostOffset = { x: (loc.x-origin.x), y: (loc.y-origin.y) } ;
     
     // position the ghost view
-    this._positionGhostView(evt) ;
+    if(!this._ghostViewHidden) this._positionGhostView(evt) ;
     
     // notify root responder that a drag is in process
     this.ghostView.rootResponder.dragDidStart(this) ;
@@ -334,9 +342,9 @@ SC.Drag = SC.Object.extend(
       return ; // quickly ignore duplicate calls
     } 
     
-    // cache the current location to avoid processing duplicate mouseDragged 
-    // calls
-    this.set('location', { x: evt.pageX, y: evt.pageY }) ;
+    // save the new location to avoid duplicate mouseDragged event processing
+    loc = { x: evt.pageX, y: evt.pageY };
+    this.set('location', loc) ;
     
     // STEP 1: Determine the deepest drop target that allows an operation.
     // if the drop target selected the last time this method was called 
@@ -383,7 +391,7 @@ SC.Drag = SC.Object.extend(
     if (source && source.dragDidMove) source.dragDidMove(this, loc) ;
     
     // reposition the ghostView
-    this._positionGhostView(evt) ;
+    if(!this._ghostViewHidden) this._positionGhostView(evt) ;
   },
   
   /**
@@ -426,7 +434,7 @@ SC.Drag = SC.Object.extend(
         console.error('Exception in SC.Drag.mouseUp(dragEnded on %@): %@'.fmt(ary[idx], ex2)) ;
       }
     }
-    
+
     // destroy the ghost view
     this._destroyGhostView() ;
     
@@ -469,8 +477,40 @@ SC.Drag = SC.Object.extend(
     var loc = this.get('location') ;
     loc.x -= this.ghostOffset.x ;
     loc.y -= this.ghostOffset.y ;
-    this.ghostView.adjust({ top: loc.y, left: loc.x }) ;   
-    this.ghostView.invokeOnce('updateLayout') ;
+    var gV = this.ghostView;
+    if(gV) {
+      gV.adjust({ top: loc.y, left: loc.x }) ;   
+      gV.invokeOnce('updateLayout') ;
+    }
+  },
+  
+  /**
+    YES if the ghostView has been manually hidden.
+    
+    @private 
+    @type {Boolean}
+    @default NO
+  */
+  _ghostViewHidden: NO,
+  
+  /**
+    Hide the ghostView.
+  */
+  hideGhostView: function() {
+    if(this.ghostView && !this._ghostViewHidden) {
+      this.ghostView.remove();
+      this._ghostViewHidden = YES;
+    }
+  },
+
+  /**
+    Unhide the ghostView.
+  */
+  unhideGhostView: function() {
+    if(this._ghostViewHidden) {
+      this._ghostViewHidden = NO;
+      this._createGhostView();
+    }
   },
   
   /** @private */
@@ -478,6 +518,7 @@ SC.Drag = SC.Object.extend(
     if (this.ghostView) {
       this.ghostView.remove() ;
       this.ghostView = null ; // this will allow the GC to collect it.
+      this._ghostViewHidden = NO;
     }
   },
   
@@ -543,7 +584,8 @@ SC.Drag = SC.Object.extend(
     for (var idx=0, len=ary.length; idx<len; idx++) {
       target = ary[idx] ;
       
-      // FIXME if (!target.get('isVisibleInWindow')) continue ;
+      // If the target is not visible, it is not valid.
+      if (!target.get('isVisibleInWindow')) continue ;
       
       // get clippingFrame, converted to the pane.
       frame = target.convertFrameToView(target.get('clippingFrame'), null) ;

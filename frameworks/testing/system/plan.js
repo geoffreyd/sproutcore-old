@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore Costello - Property Observing Library
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -226,6 +226,10 @@ CoreTest.Plan = {
     @returns {CoreTest.Plan} receiver
   */
   module: function(desc, lifecycle) {
+    if (typeof SC !== 'undefined' && SC.filename) {
+      desc = SC.filename.replace(/^.+?\/current\/tests\//,'') + '\n' + desc;
+    }
+    
     this.currentModule = desc;
 
     if (!lifecycle) lifecycle = {};

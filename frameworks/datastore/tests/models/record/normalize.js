@@ -1,6 +1,6 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
-// Copyright: ©2006-2009 Apple, Inc. and contributors.
+// Copyright: ©2006-2009 Apple Inc. and contributors.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 /*globals module ok equals same test MyApp */
@@ -10,6 +10,8 @@ var storeKeys, rec;
 module("SC.Record normalize method", {
   setup: function() {
 
+    SC.RunLoop.begin();
+ 
     MyApp = SC.Object.create({
       store: SC.Store.create()
     });
@@ -83,7 +85,12 @@ module("SC.Record normalize method", {
     
     equals(rec.storeKey, storeKeys[0], 'should find record');
     
+  },
+  
+  teardown: function() {
+    SC.RunLoop.end();
   }
+  
 });
 
 // ..........................................................

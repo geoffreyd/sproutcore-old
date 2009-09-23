@@ -1,6 +1,6 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
-// Copyright: ©2006-2009 Apple, Inc. and contributors.
+// Copyright: ©2006-2009 Apple Inc. and contributors.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 /*globals module ok equals same test MyApp */
@@ -70,5 +70,4 @@ test("recordDidChange", function() {
    status = store.readStatus( storeKey4);
    equals(status, SC.Record.READY_DIRTY, "the status shouldn't have changed.");
   
- 
 });

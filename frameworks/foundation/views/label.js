@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -73,6 +73,18 @@ SC.LabelView = SC.View.extend(SC.Control,
     @field {String}
   */
   value: '',
+  
+
+  /**
+    The exampleInlineTextFieldView property is by default a 
+    SC.InlineTextFieldView but it can be set to a customized inline text field
+    view.
+  
+    @property
+    @type {SC.View}
+    @default {SC.InlineTextFieldView}
+  */
+  exampleInlineTextFieldView: SC.InlineTextFieldView,
   
   /**
     An optional icon to display to the left of the label.  Set this value
@@ -174,6 +186,7 @@ SC.LabelView = SC.View.extend(SC.Control,
     var frameTemp = this.convertFrameFromView(this.get('frame'), null) ;
     f.width=frameTemp.width;
     f.height=frameTemp.height;
+    
     SC.InlineTextFieldView.beginEditing({
       frame: f,
       delegate: this,
@@ -181,7 +194,8 @@ SC.LabelView = SC.View.extend(SC.Control,
       value: value, 
       multiline: NO, 
       isCollection: NO,
-      validator: this.get('validator')
+      validator: this.get('validator'),
+      exampleInlineTextFieldView: this.get('exampleInlineTextFieldView')
     });
   },
   

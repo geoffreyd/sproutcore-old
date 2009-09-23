@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -26,10 +26,7 @@
   Add this mixin to any controller you want to manage selection.  It is 
   already applied to the CollectionController and ArrayController.
   
-  @author Charles Jolley
-  @author Erich Ocean
-  @version 1.0
-  @since 0.9
+  @since SproutCore 1.0
 */
 SC.SelectionSupport = {
   
@@ -37,26 +34,31 @@ SC.SelectionSupport = {
   // PROPERTIES
   // 
   
+  /**
+    Walk like a duck.
+    
+    @property {Boolean}
+  */
   hasSelectionSupport: YES,
   
   /**
     If YES, selection is allowed. Default is YES.
     
-    @type Boolean
+    @property {Boolean}
   */
   allowsSelection: YES,
   
   /**
     If YES, multiple selection is allowed. Default is YES.
     
-    @type Boolean
+    @property {Boolean}
   */
   allowsMultipleSelection: YES,
   
   /**
     If YES, allow empty selection Default is YES.
     
-    @type Boolean
+    @property {Boolean}
   */
   allowsEmptySelection: YES,
   
@@ -65,8 +67,7 @@ SC.SelectionSupport = {
     controller's selection work in concert by binding them together. You
     generally have a master selection that relays changes TO all the others.
     
-    @property
-    @type SC.SelectionSet
+    @property {SC.SelectionSet}
   */
   selection: function(key, value) {
     var content, empty;
@@ -83,30 +84,27 @@ SC.SelectionSupport = {
           // if that's not allowed, set to the first available item in 
           // arrangedObjects
           case 0:
-            empty   = this.get('allowsEmptySelection') ;
-            content = this.get('arrangedObjects') ;
-            if (!empty && content && content.get('length')>0) {
-                value = SC.SelectionSet.create().add(content, 0).freeze() ;
+            empty   = this.get('allowsEmptySelection');
+            content = this.get('arrangedObjects');
+            if (empty && content && content.get('length')>0) {
+                value = SC.SelectionSet.create().add(content, 0).freeze();
             } else value = null ;
-            break ;
+            break;
             
           // single items are always allowed
           case 1:
-            break ;
+            break;
             
           // fall through for >= 2, only allow if configured for multi-select
           default:
-            if (!this.get('allowsMultipleSelection')) {
-              value = this._scsel_selection || null ;
-              console.log(value);
-            }
-            break ;
+            if (!this.get('allowsMultipleSelection')) value = null;
+            break;
         }
-      } else value = null ;
+      } else value = null;
       
       // always make selection into something then save
-      if (!value) value = SC.SelectionSet.EMPTY ;
-      this._scsel_selection = value ;
+      if (!value) value = SC.SelectionSet.EMPTY;
+      this._scsel_selection = value;
       
     // read only mode
     } else return this._scsel_selection || SC.SelectionSet.EMPTY ;
@@ -117,7 +115,7 @@ SC.SelectionSupport = {
   /**
     YES if the receiver currently has a non-zero selection.
     
-    @property Boolean
+    @property {Boolean}
   */
   hasSelection: function() {
     var sel = this.get('selection') ;
@@ -199,21 +197,21 @@ SC.SelectionSupport = {
     else return this.deselectObjects([object]);
   },
   
-  /** 
+  /**  @private
     Call this method whenever your source content changes to ensure the 
     selection always remains up-to-date and valid.
   */
   updateSelectionAfterContentChange: function() {
-    // console.log('%@.updateSelectionAfterContentChange()'.fmt(this));
     var content = this.get('arrangedObjects'),
         sel     = this.get('selection'),
         indexes, len, max, ret;
-    
-    if (!sel) sel = SC.SelectionSet.EMPTY ;
+
+    if (!sel) sel = SC.SelectionSet.EMPTY;
     
     // if selection is not allowed, just force to be empty.
     if (!this.get('allowsSelection') && sel.get('length')>0) {
-      ret = SC.SelectionSet.EMPTY ;
+      ret = SC.SelectionSet.EMPTY;
+      
       
     // empty selection is not allowed, let the selection() property handle it
     } else if (!this.get('allowsEmptySelection') && sel.get('length')==0) {
@@ -224,14 +222,14 @@ SC.SelectionSupport = {
       
       // remove from the sel any items selected beyond the length of the new
       // arrangedObjects
-      indexes = content ? sel.indexSetForSource(content) : null ;
-      len     = content ? content.get('length') : 0 ;
-      max     = indexes ? indexes.get('max') : 0 ;
-      if (max > len) { ret = sel.copy().constrain(content).freeze(); }
+      indexes = content ? sel.indexSetForSource(content) : null;
+      len     = content ? content.get('length') : 0;
+      max     = indexes ? indexes.get('max') : 0;
+      if (max > len) ret = sel.copy().constrain(content).freeze();
+      
     }
-    
-    if (ret) this.set('selection', ret) ;
-    // else this.set('selection', sel.copy().freeze()) ; // don't want sel.frozenCopy() !
+  
+    if (ret) this.set('selection', ret);
     return this ;
   }
     

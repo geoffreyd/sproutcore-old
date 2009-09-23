@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore Costello - Property Observing Library
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -177,6 +177,9 @@ SC.mixin(/** @scope SC */ {
     Returns YES if the passed value is null or undefined.  This avoids errors
     from JSLint complaining about use of ==, which can be technically 
     confusing.
+    
+    @object {Object} obj value to test
+    @returns {Boolean}
   */
   none: function(obj) {
     return obj===null || obj===undefined;  
@@ -204,9 +207,12 @@ SC.mixin(/** @scope SC */ {
     Makes an object into an Array if it is not array or array-like already.
     Unlike SC.A(), this method will not clone the object if it is already
     an array.
+    
+    @param {Object} obj object to convert
+    @returns {Array} Actual array
   */
   makeArray: function(obj) {
-    return SC.isArray(obj) ? obj : SC.$A(obj);
+    return SC.isArray(obj) ? obj : SC.A(obj);
   },
   
   /**
@@ -287,7 +293,9 @@ SC.mixin(/** @scope SC */ {
     efficient than simply combining strings because it uses a cache  
     internally for performance.
     
-    @param 
+    @param {String} prefix the prefix to attach to the key
+    @param {String} key key
+    @returns {String} result 
   */
   keyFor: function(prefix, key) {
     var ret, pcache = this._keyCache[prefix];
@@ -398,12 +406,16 @@ SC.mixin(/** @scope SC */ {
           if ( r !== 0 ) return r;
           i++;
         }
-        
+      
         // all elements are equal now
         // shorter array should be ordered first
         if (v.length < w.length) return -1;
         if (v.length > w.length) return 1;
         // arrays are equal now
+        return 0;
+        
+      case SC.T_OBJECT:
+        if (v.constructor.isComparable === YES) return v.constructor.compare(v, w);
         return 0;
 
       default:
@@ -417,15 +429,32 @@ SC.mixin(/** @scope SC */ {
   
   /** 
     Empty function.  Useful for some operations. 
+    
+    @returns {Object}
   */
   K: function() { return this; },
 
-  /** Empty array.  Useful for some optimizations. */
+  /** 
+    Empty array.  Useful for some optimizations.
+  
+    @property {Array}
+  */
   EMPTY_ARRAY: [],
 
-  EMPTY_HASH: {},
+  /**
+    Empty hash.  Useful for some optimizations.
   
+    @property {Hash}
+  */
+  EMPTY_HASH: {},
+
+  /**
+    Empty range. Useful for some optimizations.
+    
+    @property {Range}
+  */
   EMPTY_RANGE: {start: 0, length: 0},
+  
   /**
     Creates a new object with the passed object as its prototype.
 
@@ -467,8 +496,12 @@ SC.mixin(/** @scope SC */ {
     @param object {Object} the object to clone
     @returns {Object} the cloned object
   */
-  clone: function(object) {
+  copy: function(object) {
     var ret = object ;
+    
+    // fast path
+    if (object && object.isCopyable) return object.copy();
+    
     switch (SC.typeOf(object)) {
     case SC.T_ARRAY:
       if (object.clone && SC.typeOf(object.clone) === SC.T_FUNCTION) {
@@ -597,17 +630,42 @@ SC.mixin(/** @scope SC */ {
     }
 
     return root ;
+  },
+  
+  
+  // ..........................................................
+  // LOCALIZATION SUPPORT
+  // 
+  
+  /**
+    Known loc strings
+    
+    @property {Hash}
+  */
+  STRINGS: {},
+  
+  /**
+    This is a simplified handler for installing a bunch of strings.  This
+    ignores the language name and simply applies the passed strings hash.
+    
+    @param {String} lang the language the strings are for
+    @param {Hash} strings hash of strings
+    @returns {SC} receiver
+  */
+  stringsFor: function(lang, strings) {
+    SC.mixin(SC.STRINGS, strings);
+    return this ;
   }
   
   
 }); // end mixin
 
+/** @private Aliasn for SC.clone() */
+SC.clone = SC.copy ;
+
 /** @private Alias for SC.A() */
 SC.$A = SC.A;
 
-/** @private Alias for SC.typeOf() */
-SC.typeOf = SC.typeOf ;
-  
 /** @private Provided for compatibility with old HTML templates. */
 SC.didLoad = SC.K ;
 
@@ -628,8 +686,9 @@ SC.ORDER_DEFINITION = [ SC.T_ERROR,
 // ........................................
 // FUNCTION ENHANCEMENTS
 //
+
 SC.mixin(Function.prototype, 
-/** @scope Function.prototype */ {
+/** @lends Function.prototype */ {
   
   /**
     Indicates that the function should be treated as a computed property.
@@ -727,13 +786,14 @@ SC.mixin(Function.prototype,
       
     }}}
     
-    bq. *Why Use The Same Method for Getters and Setters?*  Most property-
-    based frameworks expect you to write two methods for each property but
-    SproutCore only uses one.  We do this because most of the time when
-    you write a setter is is basically a getter plus some extra work.  There 
-    is little added benefit in writing both methods when you can conditionally
-    exclude part of it.  This helps to keep your code more compact and easier
-    to maintain.
+    h2. Why Use The Same Method for Getters and Setters?
+    
+    Most property-based frameworks expect you to write two methods for each
+    property but SproutCore only uses one. We do this because most of the time
+    when you write a setter is is basically a getter plus some extra work.
+    There is little added benefit in writing both methods when you can
+    conditionally exclude part of it. This helps to keep your code more
+    compact and easier to maintain.
     
     @param dependentKeys {String...} optional set of dependent keys
     @returns {Function} the declared function instance
@@ -795,6 +855,8 @@ SC.mixin(Function.prototype,
   /**
     Declare that a function should observe an object at the named path.  Note
     that the path is used only to construct the observation one time.
+    
+    @returns {Function} receiver
   */
   observes: function(propertyPaths) { 
     // sort property paths into local paths (i.e just a property name) and
@@ -853,4 +915,36 @@ String.prototype.fmt = function() {
     return ((s===null) ? '(null)' : (s===undefined) ? '' : s).toString(); 
   }) ;
 };
+
+/**
+  Localizes the string.  This will look up the reciever string as a key 
+  in the current Strings hash.  If the key matches, the loc'd value will be
+  used.  The resulting string will also be passed through fmt() to insert
+  any variables.
+  
+  @param args {Object...} optional arguments to interpolate also
+  @returns {String} the localized and formatted string.
+*/
+String.prototype.loc = function() {
+  var str = SC.STRINGS[this] || this;
+  return str.fmt.apply(str,arguments) ;
+};
+
+
+  
+/**
+  Splits the string into words, separated by spaces. Empty strings are
+  removed from the results.
+  
+  @returns {Array} an array of non-empty strings
+*/
+String.prototype.w = function() { 
+  var ary = [], ary2 = this.split(' '), len = ary2.length ;
+  for (var idx=0; idx<len; ++idx) {
+    var str = ary2[idx] ;
+    if (str.length !== 0) ary.push(str) ; // skip empty strings
+  }
+  return ary ;
+};
+
 

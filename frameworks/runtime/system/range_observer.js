@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore Costello - Property Observing Library
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -20,10 +20,16 @@
   
   @since SproutCore 1.0
 */
-SC.RangeObserver = /** SC.RangeObserver.prototype */ {
+SC.RangeObserver = {
 
+  /** 
+    Walk like a duck.
+    
+    @property {Boolean}
+  */
   isRangeObserver: YES,
   
+  /** @private */
   toString: function() { 
     var base = this.indexes ? this.indexes.toString() : "SC.IndexSet<..>";
     return base.replace('IndexSet', 'RangeObserver(%@)'.fmt(SC.guidFor(this)));

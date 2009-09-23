@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            portions copyright @2009 Apple, Inc.
+//            portions copyright @2009 Apple Inc.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -31,6 +31,12 @@ var pane = SC.ControlTestPane.design()
   useStaticLayout: YES, 
       layout: { width: 'auto', right: 'auto' }
     })
+      .add("unSortedStringOptions", SC.SelectFieldView, { 
+        objects:["Apple","Sproutcore 1.0","Development","Charles"],
+    useStaticLayout: YES, 
+    disableSort: YES,
+        layout: { width: 'auto', right: 'auto' }
+      })
   
     .add("Width 150 Right 0", SC.SelectFieldView, { 
       objects: [1,6,11,2,8],
@@ -41,6 +47,10 @@ var pane = SC.ControlTestPane.design()
     useStaticLayout: YES, 
     layout: { width: '150', right: '0' }
   });
+  
+  
+  
+    pane.show();
 
 // ..........................................................
 // TEST VIEWS
@@ -89,7 +99,8 @@ test("Check that by setting the value the selection actually changes", function(
   SC.RunLoop.end();
   equals(view.getFieldValue(), 2, 'the field value should change to 2');
 });
-})();test("redraw", function(){
+
+test("redraw", function(){
   var view = pane.view('redraw');
   ok(view.get('objects').length === 0, "objects should be empty");
   SC.RunLoop.begin();

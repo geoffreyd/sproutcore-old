@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -278,6 +278,15 @@ SC.CollectionViewDelegate = {
   */
   collectionViewDragViewFor: function(view, dragContent) {
     return null;
-  }
+  },
 
+  /**
+    Allows the ghost view created in collectionViewDragViewFor to be displayed
+    like a cursor instead of the default implementation. This sets the view 
+    origin to be the location of the mouse cursor.
+    
+    @property {Boolean} ghost view acts like a cursor
+  */
+  ghostActsLikeCursor: NO
+  
 };

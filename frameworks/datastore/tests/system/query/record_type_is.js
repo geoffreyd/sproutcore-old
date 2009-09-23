@@ -1,6 +1,6 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
-// Copyright: ©2006-2009 Apple, Inc. and contributors.
+// Copyright: ©2006-2009 Apple Inc. and contributors.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 /*globals module ok equals same test MyApp */
@@ -33,11 +33,11 @@ module("SC.Query comparison of record types", {
 test("should handle record types", function() {
   
   q.conditions = "TYPE_IS 'MyApp.Foo'";
-  q.parseQuery();
+  q.parse();
   equals(SC.Store.recordTypeFor(rec.storeKey), SC.objectForPropertyPath('MyApp.Foo'), 'record type should be MyApp.Foo');
   ok(q.contains(rec), 'record with proper type should match');
   
   q.conditions = "TYPE_IS 'MyApp.Baz'";
-  q.parseQuery();
+  q.parse();
   ok(!q.contains(rec), 'record with wrong type should not match');
 });

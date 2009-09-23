@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 require('panes/picker');
@@ -31,8 +31,9 @@ SC.MenuPane = SC.PickerPane.extend(
 
     @readOnly
     @type Boolean
+    @default isEnabled
   */
-  itemIsEnabledKey: YES,
+  itemIsEnabledKey: "isEnabled",
   
   /**
     The key that contains the title for each item.  If omitted, no icons will
@@ -40,8 +41,9 @@ SC.MenuPane = SC.PickerPane.extend(
 
     @readOnly
     @type String
+    @default title
   */
-  itemTitleKey: null,
+  itemTitleKey: 'title',
 
   /**
     The array of items to display.  This can be a simple array of strings,
@@ -59,8 +61,9 @@ SC.MenuPane = SC.PickerPane.extend(
 
     @readOnly
     @type String
+    @default value
   */
-  itemValueKey: null,
+  itemValueKey: 'value',
 
   /** 
     The key that contains the icon for each item.  If omitted, no icons will
@@ -68,8 +71,9 @@ SC.MenuPane = SC.PickerPane.extend(
 
     @readOnly
     @type String
+    @default icon
   */
-  itemIconKey: null,
+  itemIconKey: 'icon',
 
   /** 
     The width for each menu item and ultimately the menu itself.
@@ -97,8 +101,18 @@ SC.MenuPane = SC.PickerPane.extend(
 
     @readOnly
     @type String
+    @default height
   */
-  itemHeightKey: null,
+  itemHeightKey: 'height',
+  
+  /** 
+    The submenu for a menu item if any.
+
+    @readOnly
+    @type String
+    @default subMenu
+  */
+  subMenuKey: 'subMenu',
 
   /**
     If YES, titles will be localized before display.
@@ -110,56 +124,63 @@ SC.MenuPane = SC.PickerPane.extend(
 
     @readOnly
     @type Boolean
+    @default separator
   */  
-  itemSeparatorKey: null,
+  itemSeparatorKey: 'separator',
 
   /** 
     This key is need to assign an action to the menu item.
 
     @readOnly
     @type String
+    @default action
   */
-  itemActionKey: null,
+  itemActionKey: 'action',
 
   /** 
     The key for setting a checkbox for the menu item.
 
     @readOnly
     @type String
+    @default checkbox
   */
-  itemCheckboxKey: null,
+  itemCheckboxKey: 'checkbox',
 
   /** 
     The key for setting a branch for the menu item.
 
     @readOnly
     @type String
+    @default branchItem
   */
-  itemBranchKey: null,
+  itemBranchKey: 'branchItem',
   
   /** 
     The key for setting a branch for the menu item.
 
     @readOnly
     @type String
+    @default shortcut
   */
-  itemShortCutKey: null,
+  itemShortCutKey: 'shortcut',
   
   /** 
     The key for setting Key Equivalent for the menu item.
 
     @readOnly
     @type String
+    @default keyEquivalent
   */
-  itemKeyEquivalentKey: null,
+  itemKeyEquivalentKey: 'keyEquivalent',
   
   /** 
     The key for setting Key Equivalent for the menu item.
 
     @readOnly
     @type String
+    @default target
   */
-  itemTargetKey: null,
+  itemTargetKey: 'target',
   
   /** @private */
   isKeyPane: YES,
@@ -208,6 +229,11 @@ SC.MenuPane = SC.PickerPane.extend(
     @type SC.View
   */
   exampleView: SC.MenuItemView,
+  
+  /**
+    Control Size for the Menu Item
+  */
+  controlSize: SC.REGULAR_CONTROL_SIZE,
   
   /**
     @private
@@ -270,7 +296,7 @@ SC.MenuPane = SC.PickerPane.extend(
           if (loc && cur[0]) cur[0] = cur[0].loc() ;
           ret[rel] = SC.Object.create({ title: cur[0], value: cur[1],
                                               isEnabled: cur[2], icon: cur[3], 
-                                              isSeparator: cur[4], action: cur[5],
+                                              isSeparator: cur[4]||NO , action: cur[5],
                                               isCheckbox: cur[6], isShortCut: cur[7],
                                               menuItemNumber: idx, isBranch: cur[8],
                                               itemHeight: cur[9], subMenu: cur[10], 
@@ -307,7 +333,7 @@ SC.MenuPane = SC.PickerPane.extend(
   // ..........................................................
   // RENDERING/DISPLAY SUPPORT
   // 
-  displayProperties: ['displayItems', 'value'],
+  displayProperties: ['displayItems', 'value', 'controlSize'],
 
   /**
     The render function which depends on the displayItems and value
@@ -395,7 +421,7 @@ SC.MenuPane = SC.PickerPane.extend(
       var itemKeyEquivalent = item.get('keyEquivalent') ;
       var itemTarget = item.get('target') ;
       var itemWidth = this.get('itemWidth') ;
-      
+      var controlSize = this.get('controlSize') ;
       var itemView = this.createChildView(
         this.exampleView, {
           owner : itemView,
@@ -416,6 +442,7 @@ SC.MenuPane = SC.PickerPane.extend(
           itemHeight : itemHeight,
           itemWidth : itemWidth,
           keyEquivalent : itemKeyEquivalent,
+          controlSize: controlSize,
           content : SC.Object.create({
             title : itemTitle,
             value : itemValue,
@@ -433,27 +460,23 @@ SC.MenuPane = SC.PickerPane.extend(
       itemView.prepareContext(context, YES) ;
       context = context.end() ;
       menuItemViews.push(itemView) ;
-      this.set('menuItemViews',menuItemViews) ;
     }
+    this.set('menuItemViews',menuItemViews) ;
   },
   
   /**
-    Get the current selected Menu item
+    Observes the PreviousSelectedMenuItem and clears the submenu 
+    for that item.
     
     @returns void
   */
-  currentSelectedMenuItemObserver: function(){
-    var currentSelectedMenuItem = this.get('currentSelectedMenuItem') ;
+  previousSelectedMenuItemObserver: function(){
     var previousSelectedMenuItem = this.get('previousSelectedMenuItem') ;
-    if(previousSelectedMenuItem){
+    if(previousSelectedMenuItem) {
       var subMenu = previousSelectedMenuItem.isSubMenuAMenuPane() ;
       if(subMenu) subMenu.remove() ;
-      previousSelectedMenuItem.resignFirstResponder() ;
     }
-    if(currentSelectedMenuItem) {
-      currentSelectedMenuItem.becomeFirstResponder() ;
-    }
-  }.observes('currentSelectedMenuItem'),
+  }.observes('previousSelectedMenuItem'),
   
   /**
     This function returns whether the anchor is of type of MenuItemView
@@ -462,7 +485,7 @@ SC.MenuPane = SC.PickerPane.extend(
   */
   isAnchorMenuItemType: function() {
     var anchor = this.get('anchor') ;
-    return (anchor && anchor.kindOf(SC.MenuItemView)) ;
+    return (anchor && anchor.kindOf && anchor.kindOf(SC.MenuItemView)) ;
   },
   
   //..........................................................
@@ -480,12 +503,18 @@ SC.MenuPane = SC.PickerPane.extend(
     var items, len, menuItems, item, keyEquivalent, 
         action, isEnabled, target;
     if(!this.get('isEnabled')) return NO ;
-
+    this.displayItems() ;
     items = this.get('displayItemsArray') ;
     if (!items) return NO;
 
+    // handling esc key
+    if (keyString === 'escape') {
+      this.remove() ;
+      var pane = this.getPath('anchor.pane') ;
+      if (pane) pane.becomeKeyPane() ;
+    }
+
     len = items.length ;
-    menuItems = this.get('menuItemViews');
     for(var idx=0; idx<len; ++idx) {
       item          = items[idx] ;
       keyEquivalent = item.get('keyEquivalent') ;
@@ -493,13 +522,12 @@ SC.MenuPane = SC.PickerPane.extend(
       isEnabled     = item.get('isEnabled') ;
       target        = item.get('target') || this ;
       if(keyEquivalent == keyString && isEnabled) {
-        if(menuItems && menuItems[idx]) {
-          var retVal = menuItems[idx].triggerAction(evt);
-          return retVal;
-        }
+        var retVal = SC.RootResponder.responder.sendAction(action,target);
+        this.remove();
+        return retVal;
       }
     }
-    return YES ;
+    return NO ;
   },
   
   //Mouse and Key Events
@@ -530,7 +558,6 @@ SC.MenuPane = SC.PickerPane.extend(
   */
   moveDown: function(menuItem) {
     var currentSelectedMenuItem = this.getNextEnabledMenuItem(menuItem) ;
-    this.set('currentItemSelected',currentSelectedMenuItem) ;
     if(menuItem) menuItem.resignFirstResponder() ;
     currentSelectedMenuItem.becomeFirstResponder() ;
   },
@@ -543,7 +570,6 @@ SC.MenuPane = SC.PickerPane.extend(
   */
   moveUp: function(menuItem) {
     var currentSelectedMenuItem = this.getPreviousEnabledMenuItem(menuItem) ;
-    this.set('currentItemSelected',currentSelectedMenuItem) ;
     if(menuItem) menuItem.resignFirstResponder() ;
     currentSelectedMenuItem.becomeFirstResponder() ;
     return YES ;
@@ -559,16 +585,17 @@ SC.MenuPane = SC.PickerPane.extend(
     if(menuItemViews) {
       var len = menuItemViews.length ;
       var idx = (menuItemViews.indexOf(menuItem) === -1) ? len : menuItemViews.indexOf(menuItem) ;
+      var menuIdx = idx;
       var isEnabled = NO ;
       var isSeparator = NO ;
-      while(--idx >= 0 && !isEnabled && !isSeparator) {
+      while((!isEnabled || isSeparator) && --idx !== menuIdx) {
+        if(idx === -1) idx = len - 1;
         isEnabled = menuItemViews[idx].get('isEnabled') ;
         var content = menuItemViews[idx].get('content') ;
         if(content) {
           isSeparator = content.get(menuItemViews[idx].get('isSeparatorKey'));
         }
       }
-      if(idx === -1) idx = len - 1;
       return menuItemViews[idx];
     }
   },
@@ -582,17 +609,19 @@ SC.MenuPane = SC.PickerPane.extend(
     var menuItemViews = this.get('menuItemViews') ;
     if(menuItemViews) {
       var len = menuItemViews.length ;
-      var idx = (menuItemViews.indexOf(menuItem) === -1) ? 0 : menuItemViews.indexOf(menuItem) ;
+      var idx = (menuItemViews.indexOf(menuItem) === -1) ? 
+        0 : menuItemViews.indexOf(menuItem) ;
+      var menuIdx = idx;
       var isEnabled = NO ;
       var isSeparator = NO ;
-      while(!isEnabled && !isSeparator && ++idx < len) {
+      while((!isEnabled || isSeparator) && ++idx !== menuIdx) {
+        if(idx === len) idx = 0;
         isEnabled = menuItemViews[idx].get('isEnabled') ;
         var content = menuItemViews[idx].get('content') ;
         if(content) {
           isSeparator = content.get(menuItemViews[idx].get('isSeparatorKey'));
         }
       }
-      if(idx === len) idx = 0 ;
       return menuItemViews[idx] ;
     }
   },
@@ -637,8 +666,7 @@ SC.MenuPane = SC.PickerPane.extend(
       else return null;
     }
     else return null;
-  },
-  
+  }
   
   
 });

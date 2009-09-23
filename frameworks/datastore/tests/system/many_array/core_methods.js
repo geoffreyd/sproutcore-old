@@ -1,14 +1,15 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
-// Copyright: ©2006-2009 Apple, Inc. and contributors.
+// Copyright: ©2006-2009 Apple Inc. and contributors.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 /*globals module ok equals same test MyApp */
 
 // test core array-mapping methods for ManyArray
-var store, storeKey, storeId, rec, storeIds, recs;
+var store, storeKey, storeId, rec, storeIds, recs, arrayRec;
 module("SC.ManyArray core methods", {
   setup: function() {
+    
     // setup dummy app and store
     MyApp = SC.Object.create({
       store: SC.Store.create()
@@ -17,14 +18,18 @@ module("SC.ManyArray core methods", {
     // setup a dummy model
     MyApp.Foo = SC.Record.extend({});
     
-    // load some data
-    MyApp.store.loadRecords(MyApp.Foo, [
-      { guid: 1, firstName: "John", lastName: "Doe" },
-      { guid: 2, firstName: "Jane", lastName: "Doe" },
-      { guid: 3, firstName: "Emily", lastName: "Parker" },
-      { guid: 4, firstName: "Johnny", lastName: "Cash" }
-    ]);
+    SC.RunLoop.begin();
     
+    // load some data
+    storeIds = [1,2,3,4];
+    MyApp.store.loadRecords(MyApp.Foo, [
+      { guid: 1, firstName: "John", lastName: "Doe", age: 32 },
+      { guid: 2, firstName: "Jane", lastName: "Doe", age: 30 },
+      { guid: 3, firstName: "Emily", lastName: "Parker", age: 7 },
+      { guid: 4, firstName: "Johnny", lastName: "Cash", age: 17 },
+      { guid: 50, firstName: "Holder", fooMany: storeIds }
+    ]);
+     
     storeKey = MyApp.store.storeKeyFor(MyApp.Foo, 1);
     
     // get record
@@ -32,9 +37,19 @@ module("SC.ManyArray core methods", {
     storeId = rec.get('id');
     
     // get many array.
-    storeIds = [1,2,3,4];
-    recs = SC.ManyArray.create({ store: MyApp.store, storeIds: storeIds, recordType: MyApp.Foo });
+    arrayRec = MyApp.store.materializeRecord(MyApp.store.storeKeyFor(MyApp.Foo, 50));
     
+    recs = SC.ManyArray.create({ 
+      record: arrayRec,
+      propertyName: "fooMany", 
+      recordType: MyApp.Foo,
+      isEditable: YES
+    });
+    arrayRec.relationships = [recs]; 
+  },
+  
+  teardown: function() {
+    SC.RunLoop.end();
   }
 });
 
@@ -121,6 +136,7 @@ test("adding a record to the ManyArray should pass through storeIds", function()
   equals(recs.objectAt(1), rec, 'recs.objectAt(1) should return old record');
   
   // verify storeKeys
+  storeIds = arrayRec.readAttribute('fooMany'); // array might have changed
   equals(storeIds.objectAt(0), storeId2, 'storeKeys[0] should return new storeKey');
   equals(storeIds.objectAt(1), storeId, 'storeKeys[1] should return old storeKey');
 });
@@ -149,7 +165,7 @@ test("swapping storeIds array should change ManyArray and observers", function()
   var rec2 = MyApp.store.createRecord(MyApp.Foo, { guid: 5, firstName: "rec2" });
   var storeId2 = rec2.get('id');
   var storeIds2 = [storeId2];
-
+  
   // setup observer
   var obj = SC.Object.create({
     cnt: 0,
@@ -162,7 +178,10 @@ test("swapping storeIds array should change ManyArray and observers", function()
   
   // now swap storeKeys
   obj.cnt = 0 ;
-  recs.set('storeIds', storeIds2);
+  arrayRec.writeAttribute('fooMany', storeIds2);
+
+  SC.RunLoop.end();
+  SC.RunLoop.begin();
   
   // verify observer fired and record changed
   equals(obj.cnt, 1, 'observer should have fired after swap');
@@ -175,4 +194,11 @@ test("swapping storeIds array should change ManyArray and observers", function()
   equals(recs.get('length'), 2, 'should reflect new length');
   equals(recs.objectAt(0), rec, 'recs.objectAt(0) should return pushed rec');  
 
+});
+
+test("reduced properties", function() {
+  equals(recs.get('@sum(age)'), 32+30+7+17, 'sum reducer should return the correct value');
+  equals(recs.get('@max(age)'), 32, 'max reducer should return the correct value');
+  equals(recs.get('@min(age)'), 7, 'min reducer should return the correct value');
+  equals(recs.get('@average(age)'), (32+30+7+17)/4.0, 'average reducer should return the correct value');
 });

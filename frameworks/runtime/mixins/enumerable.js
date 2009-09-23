@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore Costello - Property Observing Library
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -45,13 +45,14 @@ require('system/enumerator');
   libraries by implementing only methods that mostly correspond to the
   JavaScript 1.8 API.  
   
-  @static
   @since SproutCore 1.0
 */
 SC.Enumerable = {
 
   /** 
     Walk like a duck.
+    
+    @property {Boolean}
   */
   isEnumerable: YES,
   
@@ -173,20 +174,9 @@ SC.Enumerable = {
     @returns {Array} extracted values
   */
   getEach: function(key) {
-    var len = this.get ? this.get('length') : this.length ;
-    var ret = [] ;
-
-    var last = null ;
-    var context = SC.Enumerator._popContext();
-    for(var idx=0;idx<len;idx++) {
-      var next = this.nextObject(idx, last, context) ;
-      var obj = next ? (next.get ? next.get(key) : next[key]) : null;
-      ret[ret.length] = obj;
-      last = next ;
-    }
-    last = null;
-    context = SC.Enumerator._pushContext(context);
-    return ret ;
+    return this.map(function(next) {
+      return next ? (next.get ? next.get(key) : next[key]) : null;
+    }, this);
   },
 
   /**
@@ -200,21 +190,12 @@ SC.Enumerable = {
     @returns {Object} receiver
   */
   setEach: function(key, value) {
-    var len = this.get ? this.get('length') : this.length ;
-
-    var last = null ;
-    var context = SC.Enumerator._popContext();
-    for(var idx=0;idx<len;idx++) {
-      var next = this.nextObject(idx, last, context) ;
+    this.forEach(function(next) {
       if (next) {
-        if (next.set) {
-          next.set(key, value) ;
-        } else next[key] = value ;
+        if (next.set) next.set(key, value) ;
+        else next[key] = value ;
       }
-      last = next ;
-    }
-    last = null;
-    context = SC.Enumerator._pushContext(context);
+    }, this);
     return this ;
   },
   
@@ -269,18 +250,9 @@ SC.Enumerable = {
     @returns {Array} The mapped array.
   */
   mapProperty: function(key) {
-    var len = this.get ? this.get('length') : this.length ;
-    var ret  = [];
-    var last = null ;
-    var context = SC.Enumerator._popContext();
-    for(var idx=0;idx<len;idx++) {
-      var next = this.nextObject(idx, last, context) ;
-      ret[idx] = next ? (next.get ? next.get(key) : next[key]) : null;
-      last = next ;
-    }
-    last = null ;
-    context = SC.Enumerator._pushContext(context);
-    return ret ;
+    return this.map(function(next) { 
+      return next ? (next.get ? next.get(key) : next[key]) : null;
+    });
   },
 
   /**
@@ -777,7 +749,7 @@ SC._buildReducerFor = function(reducerKey, reducerProperty) {
   }.property('[]') ;
 };
 
-SC.Reducers = {
+SC.Reducers = /** @lends SC.Enumerable */ {
   /**
     This property will trigger anytime the enumerable's content changes.
     You can observe this property to be notified of changes to the enumerables
@@ -785,6 +757,8 @@ SC.Reducers = {
     
     For plain enumerables, this property is read only.  SC.Array overrides
     this method.
+    
+    @property {SC.Array}
   */
   '[]': function(key, value) { return this ; }.property(),
 
@@ -826,15 +800,21 @@ SC.Reducers = {
       }
     }}}
      
-    @param key {String} the reduce property key
-    @param value {Object} a value or undefined.
-    @param generateProperty {Boolean} only set to false if you do not want an
-      optimized computed property handler generated for this.  Not common.
+    @param {String} key
+      the reduce property key
+    
+    @param {Object} value
+      a value or undefined.
+    
+    @param {Boolean} generateProperty
+      only set to false if you do not want an optimized computed property 
+      handler generated for this.  Not common.
+  
     @returns {Object} the reduced property or undefined
   */
   reducedProperty: function(key, value, generateProperty) {
      
-    if (key[0] !== '@') return undefined ; // not a reduced property
+    if (!key || key.charAt(0) !== '@') return undefined ; // not a reduced property
     
     // get the reducer key and the reducer
     var matches = key.match(/^@([^(]*)(\(([^)]*)\))?$/) ;

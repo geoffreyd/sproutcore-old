@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -163,9 +163,9 @@ SC.ResponderContext = SC.Responder.extend({
     this._notifyDidBecomeFirstResponder(responder, responder, common);
     
     this._locked = NO ;
-    if (responder = this._pendingResponder) {
-      this._pendingResponder= null ;
+    if (this._pendingResponder) {
       this.makeFirstResponder(this._pendingResponder);
+      this._pendingResponder = null;
     }
     
     return this ;

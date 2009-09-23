@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -70,7 +70,7 @@ SC.ToolbarView = SC.View.extend(
   // 
   
   /** @private */
-  layout: { left: 0, height: 36, right: 0 },
+  layout: { left: 0, height: 32, right: 0 },
   
   /** @private */
   init: function() {

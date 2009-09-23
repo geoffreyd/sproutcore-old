@@ -1,7 +1,7 @@
 // ========================================================================
 // SproutCore -- JavaScript Application Framework
 // Copyright ©2006-2008, Sprout Systems, Inc. and contributors.
-// Portions copyright ©2008 Apple, Inc.  All rights reserved.
+// Portions copyright ©2008 Apple Inc.  All rights reserved.
 // ========================================================================
 
 /**
@@ -500,9 +500,9 @@ SC.Timer = SC.Object.extend(
   
 }) ;
 
-/**
-  @scope SC.Timer
-  
+/** @scope SC.Timer */
+
+/*  
   Created a new timer with the passed properties and schedules it to 
   execute.  This is the same as calling SC.Time.create({ props }).schedule().
   
