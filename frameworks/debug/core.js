@@ -92,8 +92,6 @@ SC.mapDisplayNames = function(obj, level, path, seenHash, seenArray) {
       path[loc] = key ;
       SC.mapDisplayNames(val, level+1, path, seenHash, seenArray);
     }
-  } catch (e) {
-    console.log("Exception during SC.mapDisplayNames(): %@".fmt(e));
   }
 
   path.pop();
