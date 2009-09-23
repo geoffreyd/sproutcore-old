@@ -60,38 +60,42 @@ SC.mapDisplayNames = function(obj, level, path, seenHash, seenArray) {
   var loc = path.length, str, val, t;
   path[loc] = '';
 
-  for(var key in obj) {
-    if (obj.hasOwnProperty && !obj.hasOwnProperty(key)) continue ;
-    if (!isNaN(Number(key))) continue ; // skip array indexes
-    if (key === "constructor") continue ;
-    if (key === "superclass") continue ;
-    if (key === "document") continue ;
+  try {
+    for(var key in obj) {
+      if (obj.hasOwnProperty && !obj.hasOwnProperty(key)) continue ;
+      if (!isNaN(Number(key))) continue ; // skip array indexes
+      if (key === "constructor") continue ;
+      if (key === "superclass") continue ;
+      if (key === "document") continue ;
 
-    val = obj[key];
-    if (key === "SproutCore") key = "SC";
-    t   = SC.typeOf(val);
-    if (t === SC.T_FUNCTION) {
-      if (!val.displayName) { // only name the first time it is encountered
+      val = obj[key];
+      if (key === "SproutCore") key = "SC";
+      t   = SC.typeOf(val);
+      if (t === SC.T_FUNCTION) {
+        if (!val.displayName) { // only name the first time it is encountered
+          path[loc] = key ;
+          str = path.join('.').replace('.prototype.', '#');
+          val.displayName = str;
+        }
+
+        // handle constructor-style
+        if (val.prototype) {
+          path.push("prototype");
+          SC.mapDisplayNames(val.prototype, level+1, path, seenHash, seenArray);
+          path.pop();
+        }
+
+      } else if (t === SC.T_CLASS) {
         path[loc] = key ;
-        str = path.join('.').replace('.prototype.', '#');
-        val.displayName = str;
+        SC.mapDisplayNames(val, level+1, path, seenHash, seenArray);
+
+      } else if ((key.indexOf('_')!==0) && (t===SC.T_OBJECT || t===SC.T_HASH)) {
+        path[loc] = key ;
+        SC.mapDisplayNames(val, level+1, path, seenHash, seenArray);
       }
-
-      // handle constructor-style
-      if (val.prototype) {
-        path.push("prototype");
-        SC.mapDisplayNames(val.prototype, level+1, path, seenHash, seenArray);
-        path.pop();
-      }
-
-    } else if (t === SC.T_CLASS) {
-      path[loc] = key ;
-      SC.mapDisplayNames(val, level+1, path, seenHash, seenArray);
-
-    } else if ((key.indexOf('_')!==0) && (t===SC.T_OBJECT || t===SC.T_HASH)) {
-      path[loc] = key ;
-      SC.mapDisplayNames(val, level+1, path, seenHash, seenArray);
-    }
+    } 
+  } catch (e) {
+    console.log("Exception during SC.mapDisplayNames(): %@".fmt(e));
   }
 
   path.pop();
