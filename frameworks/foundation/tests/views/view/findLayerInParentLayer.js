@@ -1,6 +1,6 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
-// Copyright: ©2006-2009 Apple, Inc. and contributors.
+// Copyright: ©2006-2009 Apple Inc. and contributors.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -17,7 +17,7 @@ module("SC.View#findLayerInParentLayer", {
     
     // manually construct a test layer.  next childDom a few layers deep
     childDom = document.createElement('div');
-    childDom.setAttribute('id', layerId);
+    SC.$(childDom).attr('id', layerId);
     
     var intermediate = document.createElement('div');
     intermediate.appendChild(childDom);

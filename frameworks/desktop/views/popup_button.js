@@ -13,6 +13,14 @@ SC.PopupButtonView = SC.ButtonView.extend({
   */
   keyEquivalent: null,
   classNames: ['sc-popup-button'],
+  
+  /**
+    Prefer matrix to pass the offsets to position the pane popped up by this 
+    button.
+    
+    @property
+  */
+  preferMatrix: null,
     
   /**private */
   acceptsFirstResponder: YES,
@@ -44,14 +52,6 @@ SC.PopupButtonView = SC.ButtonView.extend({
   */
   isSelectedBinding: '*menu.isVisibleInWindow',
   
-  /**private*/
-  render: function(context,firstTime) {
-    sc_super() ;
-    var menu = this.get('menu') ;
-    if(firstTime && menu) {
-      menu.createLayer() ;
-    }
-  },
   /**
     Button action handler
     @param {DOMMouseEvent} evt mouseup event that triggered the action
@@ -61,7 +61,7 @@ SC.PopupButtonView = SC.ButtonView.extend({
     var menu = this.get('menu') ;
     // no menu to toggle... bail...
     if (!menu) return NO ;
-    menu.popup(this) ;
+    menu.popup(this, this.preferMatrix) ;
     return YES;
   }
   

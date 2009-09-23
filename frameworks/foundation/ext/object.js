@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -22,21 +22,23 @@ SC.mixin(SC.Object.prototype, /** @scope SC.Object.prototype */ {
     If you would prefer to pass your own parameters instead, you can instead
     call invokeLater() directly on the function object itself.
     
-    @param interval {Number} period from current time to schedule.
     @param methodName {String} method name to perform.
+    @param interval {Number} period from current time to schedule.
     @returns {SC.Timer} scheduled timer.
   */
   invokeLater: function(methodName, interval) {
     if (interval === undefined) interval = 1 ;
-    var f = methodName ;
+    var f = methodName, args, func;
+    
+    // if extra arguments were passed - build a function binding.
     if (arguments.length > 2) {
-      var args =SC.$A(arguments).slice(2);
-      args.unshift(this);
+      args = SC.$A(arguments).slice(2);
       if (SC.typeOf(f) === SC.T_STRING) f = this[methodName] ;
-      // f = f.bind.apply(f, args) ;
-      var that = this, func = f ;
-      f = function() { return func.apply(that, args.slice(1)); } ;
+      func = f ;
+      f = function() { return func.apply(this, args); } ;
     }
+
+    // schedule the timer
     return SC.Timer.schedule({ target: this, action: f, interval: interval });
   },
   
@@ -58,8 +60,8 @@ SC.mixin(SC.Object.prototype, /** @scope SC.Object.prototype */ {
     You may pass either a function itself or a target/method pair.
     
     @param {String} pathName
-    @param {Object} target or method
-    @param {Function} method
+    @param {Object} target target or method
+    @param {Function|String} method
     @returns {SC.Object} receiver
   */
   invokeWith: function(pathName, target, method) {

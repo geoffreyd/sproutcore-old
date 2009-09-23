@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -262,6 +262,7 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
     // if the state has changed, update it and notify children
     if (last !== cur) {
       this.set('isVisibleInWindow', cur) ;
+      this._needsVisibiltyChange = YES ; // update even if we aren't visible
       
       var childViews = this.get('childViews'), len = childViews.length, idx;
       for(idx=0;idx<len;idx++) {
@@ -271,19 +272,13 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
       // if we just became visible, update layer + layout if needed...
       if (cur) {
         if (this.parentViewDidResize) this.parentViewDidResize();
-        this.set('layerNeedsUpdate', YES);
-        this.invokeOnce(this.updateLayerIfNeeded);
         
         if (this.get('childViewsNeedLayout')) {
           this.invokeOnce(this.layoutChildViewsIfNeeded);
         }
-        
-      // if we just became invisible, force an update to hide the layer
-      } else {
-        var that = this;
-        this.set('layerNeedsUpdate', YES);
-        this.invokeOnce(function() { that.updateLayerIfNeeded(YES); });
       }
+      
+      this.set('layerNeedsUpdate', YES) ;
       
       // if we were firstResponder, resign firstResponder also if no longer
       // visible.
@@ -670,19 +665,19 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
     @returns {SC.View} receiver
     @test in updateLayer
   */
-  updateLayerIfNeeded: function(isVisible) {
-    if (!isVisible) isVisible = this.get('isVisibleInWindow') ;
-    if (isVisible && this.get('layerNeedsUpdate')) {
+  updateLayerIfNeeded: function() {
+    var viz = this.get('isVisibleInWindow') ;
+    if ((viz || this._needsVisibiltyChange) && this.get('layerNeedsUpdate')) {
+      this._needsVisibiltyChange = NO ;
       // only update a layer if it already exists
       if (this.get('layer')) {
         this.beginPropertyChanges() ;
         this.set('layerNeedsUpdate', NO) ;
         this.updateLayer() ;
         this.endPropertyChanges() ;
-        
-      // clear our layerNeedsUpdate flag so we can respond to changes later
-      } else this.set('layerNeedsUpdate', NO) ;
+      }
     }
+    else this.set('layerNeedsUpdate', NO) ;
     return this ;
   },
   
@@ -707,6 +702,7 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
     var context = this.renderContext(this.get('layer')) ;
     this.prepareContext(context, NO) ;
     context.update() ;
+    if (this.didUpdateLayer) this.didUpdateLayer(); // call to update DOM
     return this ;
   },
   
@@ -870,11 +866,14 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
     cursor = this.get('cursor') ;
     if (cursor) context.addClass(cursor.get('className')) ;
     
+    this.beginPropertyChanges() ;
+    this.set('layerNeedsUpdate', NO) ;
     this.render(context, firstTime) ;
     if (mixins = this.renderMixin) {
       len = mixins.length;
       for(idx=0; idx<len; ++idx) mixins[idx].call(this, context, firstTime) ;
     }
+    this.endPropertyChanges() ;
   },
   
   /**
@@ -1205,6 +1204,102 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
     while (!ret && (++idx < len)) {
       ret = childViews[idx].performKeyEquivalent(keystring, evt) ;
     }
+    return ret ;
+  },
+  
+  /**
+    Optionally points to the next key view that should gain focus when tabbing
+    through an interface.  If this is not set, then the next key view will
+    be set automatically to the next child.
+  */
+  nextKeyView: null,
+  
+  /**
+    Computes the next valid key view, possibly returning the receiver or null.
+    This is the next key view that acceptsFirstResponder.
+    
+    @property
+    @type SC.View
+  */
+  nextValidKeyView: function() {
+    var seen = SC.CoreSet.create(),
+        ret  = this._computeNextValidKeyView(seen);
+    seen.destroy();
+    return ret ;
+  }.property('nextKeyView'),
+  
+  _computeNextValidKeyView: function(seen) {  
+    var ret = this.get('nextKeyView'),
+        pv, cv, idx;
+
+    seen.add(this); // avoid cycles
+    
+    // find next sibling
+    if (!ret) {
+      pv = this.get('parentView');
+      cv = pv ? pv.get('childViews') : null;
+      idx = cv ? cv.indexOf(this) : -1 ;
+      
+      // get next child if possible
+      if (idx<0) ret = null;
+      else if (idx+1 >= cv.get('length')) ret = cv.objectAt(0);
+      else ret = cv.objectAt(idx+1);
+    }
+    
+    // if next view does not accept responder then get nextValidKeyView...
+    if (ret && !ret.get('acceptsFirstResponder')) {
+      if (seen.contains(ret)) ret = null;
+      else ret = ret._computeNextValidKeyView(seen);
+    }
+    
+    return ret ;
+  },
+  
+  /**
+    Optionally points to the previous key view that should gain focus when
+    tabbing through the interface. If this is not set then the previous 
+    key view will be set automatically to the previous child.
+  */
+  previousKeyView: null,
+
+  /**
+    Computes the previous valid key view, possibly returning the receiver or 
+    null.  This is the previous key view that acceptsFirstResponder.
+    
+    @property
+    @type SC.View
+  */
+  previousValidKeyView: function() {
+    var seen = SC.CoreSet.create(),
+        ret  = this._computePreviousValidKeyView(seen);
+    seen.destroy();
+    return ret ;
+  }.property('previousKeyView'),
+  
+  _computePreviousValidKeyView: function(seen) {  
+    var ret = this.get('previousKeyView'),
+        pv, cv, idx;
+
+    seen.add(this); // avoid cycles
+    
+    // find previous sibling
+    if (!ret) {
+      pv = this.get('parentView');
+      cv = pv ? pv.get('childViews') : null;
+      idx = cv ? cv.indexOf(this) : -1 ;
+      
+      // get next child if possible
+      if (idx<0) ret = null;
+      else if (idx > 0) ret = cv.objectAt(idx-1);
+      else ret = cv.objectAt(cv.get('length')-1);
+    }
+    
+    // if next view does not accept responder then get nextValidKeyView...
+    if (ret && !ret.get('acceptsFirstResponder')) {
+      if (seen.contains(ret)) ret = null;
+      else ret = ret._computePreviousValidKeyView(seen);
+    }
+    
     return ret ;
   },
   
@@ -1579,7 +1674,7 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
   */
   frame: function() {
     return this.computeFrameWithParentFrame(null) ;
-  }.property().cacheable(),
+  }.property('layout').cacheable(),
   
   /**
     Computes what the frame of this view would be if the parent were resized
@@ -2200,11 +2295,32 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
   },
   
   /** walk like a duck */
-  isView: YES
+  isView: YES,
+  
+  /**
+    Default method called when a selectstart event is triggered. This event is 
+    only supported by IE. Used in sproutcore to disable text selection and 
+    IE8 accelerators. The accelerators will be enabled only in 
+    text selectable views. In FF and Safari we use the css style 'allow-select'.
+    
+    If you want to enable text selection in certain controls is recommended
+    to override this function to always return YES , instead of setting 
+    isTextSelectable to true. 
+    
+    For example in textfield you dont want to enable textSelection on the text
+    hint only on the actual text you are entering. You can achieve that by
+    only overriding this method.
+    
+    @param evt {SC.Event} the selectstart event
+    @returns YES if selectable
+  */
+  selectStart: function(evt) {
+    return this.get('isTextSelectable');
+  }
   
 });
 
-SC.View.mixin(/** @scope SC.View @static */ {
+SC.View.mixin(/** @scope SC.View */ {
   
   /** @private walk like a duck -- used by SC.Page */
   isViewClass: YES,

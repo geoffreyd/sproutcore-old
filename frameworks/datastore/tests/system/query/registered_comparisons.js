@@ -1,6 +1,6 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
-// Copyright: ©2006-2009 Apple, Inc. and contributors.
+// Copyright: ©2006-2009 Apple Inc. and contributors.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 /*globals module ok equals same test MyApp */
@@ -35,6 +35,12 @@ module("SC.Query comparison of records", {
     
     
     q = SC.Query.create();
+  },
+  
+  teardown: function() {
+    // IMPORTANT: must delete so we don't screw up other unit tests.
+    // cleanup after ourselves
+    delete SC.Query.comparisons.firstName;
   }
 });
  
@@ -51,10 +57,10 @@ test("SC.Query.comparisons", function(){
   });
   ok(SC.Query.comparisons['firstName'], 'comparison for firstName should be set');
   q.orderBy = "firstName";
-  q.parseQuery();
+  q.parse();
   equals(q.compare(rec2,rec3), -1, "firstName should be compared by registered comparison");
   
   q.orderBy = "lastName";
-  q.parseQuery();
+  q.parse();
   equals(q.compare(rec2,rec3), -1, "lastName should be compared by SC.compare()");
 });

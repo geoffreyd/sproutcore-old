@@ -1,14 +1,15 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
 sc_require('mixins/tree_item_content');
 sc_require('mixins/collection_content');
 
-/**
+/** 
+  @ignore
   @class
   
   A TreeNode is an internal class that will manage a single item in a tree
@@ -367,7 +368,6 @@ SC.TreeItemObserver = SC.Object.extend(SC.Array, SC.CollectionContent, {
     treeItemIsGrouped
   */
   contentGroupIndexes: function(view, content) {
-    
     if (content !== this) return null; // only care about receiver
 
     var ret = this._contentGroupIndexes;

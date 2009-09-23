@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore Test Runner
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 /*globals Welcome */
@@ -19,5 +19,12 @@ Welcome = SC.Object.create(
 
   NAMESPACE: 'Welcome',
   VERSION: '1.0.0',
+  
+  store: SC.Store.create().from('CoreTools.DataSource'),
+  
+  displayTitle: function() {
+    var hostname = (window.location.hostname || 'localhost').toString();
+    return hostname.match(/sproutcore\.com/) ? "SproutCore Demos".loc() : "SproutCore Developer Tools";
+  }.property().cacheable()
 
 }) ;

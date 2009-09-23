@@ -1,7 +1,7 @@
 // ========================================================================
 // SproutCore -- JavaScript Application Framework
 // Copyright ©2006-2008, Sprout Systems, Inc. and contributors.
-// Portions copyright ©2008 Apple, Inc.  All rights reserved.
+// Portions copyright ©2008 Apple Inc.  All rights reserved.
 // ========================================================================
 
 /** @static
@@ -75,6 +75,16 @@ SC.ResponderProtocol = {
     @returns {void}
   */
   mouseMoved: function(evt) {},
+  
+  
+  /**
+    Called when a selectstart event in IE is triggered. ONLY IE
+    We use it to disable IE accelerators and text selection
+    
+    @param evt {SC.Event} the selectstart event
+    @returns {void}
+  */
+  selectStart: function(evt) {},
   
   // .......................................................................
   // Event Handlers

@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -47,7 +47,7 @@ test("clone on next retrieval if styles(foo) set with cloneOnModify=YES", functi
 
 test("extracts styles from element on first retrieval", function() {
   var elem = document.createElement('div');
-  elem.setAttribute('style', 'color: black; height: 20px; ');
+  SC.$(elem).attr('style', 'color: black; height: 20px; ');
   context = SC.RenderContext(elem);
   
   var result = context.styles();

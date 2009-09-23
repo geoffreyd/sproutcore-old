@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -37,8 +37,7 @@ SC.Controller = SC.Object.extend(
     itself does not do anything with this property but subclasses will 
     respect it when modifying content.
     
-    @property
-    @type Boolean
+    @property {Boolean}
   */
   isEditable: YES
   

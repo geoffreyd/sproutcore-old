@@ -1,6 +1,6 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
-// Copyright: ©2006-2009 Apple, Inc. and contributors.
+// Copyright: ©2006-2009 Apple Inc. and contributors.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 /*globals module ok equals same test MyApp */
@@ -8,6 +8,7 @@
 var store, Foo, json, foo ;
 module("SC.Record#readAttribute", {
   setup: function() {
+    SC.RunLoop.begin();
     store = SC.Store.create();
     Foo = SC.Record.extend();
     json = { 
@@ -19,6 +20,10 @@ module("SC.Record#readAttribute", {
     
     foo = store.createRecord(Foo, json);
     store.writeStatus(foo.storeKey, SC.Record.READY_CLEAN); 
+  },
+  
+  teardown: function() {
+    SC.RunLoop.end();
   }
 });
 

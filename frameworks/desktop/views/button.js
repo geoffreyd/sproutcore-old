@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -38,7 +38,8 @@ SC.ButtonView = SC.View.extend(SC.Control, SC.Button, SC.StaticLayout,
     should set a class name on the HTML with the same value to allow CSS 
     styling.
     
-    The default SproutCore theme supports "regular", "checkbox", and "radio"
+    The default SproutCore theme supports "regular", "capsule", "checkbox", 
+    and "radio"
   */
   theme: 'square',
   
@@ -119,7 +120,7 @@ SC.ButtonView = SC.View.extend(SC.Control, SC.Button, SC.StaticLayout,
     @returns {bool} success/failure of the request
   */  
   triggerAction: function(evt) {  
-    if (!this.get('isEnabled')) return false;
+    if (!this.get('isEnabled')) return NO;
     this.set('isActive', YES);
     this._action(evt);
     this.didTriggerAction();
@@ -172,9 +173,10 @@ SC.ButtonView = SC.View.extend(SC.Control, SC.Button, SC.StaticLayout,
 
     // If there is a toolTip set, grab it and localize if necessary.
     var toolTip = this.get('toolTip') ;
-    if(SC.typeOf(toolTip) === SC.T_STRING) {
-        context.attr('title', this.get('localize') ? toolTip.loc() : toolTip) ;
-        context.attr('alt', this.get('localize') ? toolTip.loc() : toolTip) ;
+    if (SC.typeOf(toolTip) === SC.T_STRING) {
+      if (this.get('localize')) toolTip = toolTip.loc() ;
+      context.attr('title', toolTip) ;
+      context.attr('alt', toolTip) ;
     }
     
     // add some standard attributes & classes.
@@ -228,6 +230,13 @@ SC.ButtonView = SC.View.extend(SC.Control, SC.Button, SC.StaticLayout,
     if (!this.get('isEnabled')) return YES ; // handled event, but do nothing
     this.set('isActive', YES);
     this._isMouseDown = YES;
+    if (!this._isFocused) {
+      this._isFocused = YES ;
+      this.becomeFirstResponder();
+      if (this.get('isVisibleInWindow')) {
+        this.$()[0].focus();
+      }
+    }
     return YES ;
   },
 
@@ -256,6 +265,21 @@ SC.ButtonView = SC.View.extend(SC.Control, SC.Button, SC.StaticLayout,
     var inside = this.$().within(evt.target) ;
     if (inside && this.get('isEnabled')) this._action(evt) ;
     return true ;
+  },
+  
+  
+  keyDown: function(evt) {
+    // handle tab key
+    if (evt.which === 9) {
+      var view = evt.shiftKey ? this.get('previousValidKeyView') : this.get('nextValidKeyView');
+      view.becomeFirstResponder();
+      return YES ; // handled
+    }    
+    if (evt.which === 13) {
+      this.triggerAction(evt);
+      return YES ; // handled
+    }
+    return YES; 
   },
 
   /** @private  Perform an action based on the behavior of the button.
@@ -325,6 +349,26 @@ SC.ButtonView = SC.View.extend(SC.Control, SC.Button, SC.StaticLayout,
       eval("this.action = function(e) { return "+ action +"(this, e); };");
       this.action(evt);
     }
+  },
+  
+  /** tied to the isEnabled state */
+  acceptsFirstResponder: function() {
+    return this.get('isEnabled');
+  }.property('isEnabled'),
+  
+  willBecomeKeyResponderFrom: function(keyView) {
+    // focus the text field.
+    if (!this._isFocused) {
+      this._isFocused = YES ;
+      this.becomeFirstResponder();
+      if (this.get('isVisibleInWindow')) {
+        this.$()[0].focus();
+      }
+    }
+  },
+  
+  willLoseKeyResponderTo: function(responder) {
+    if (this._isFocused) this._isFocused = NO ;
   }
   
 }) ;

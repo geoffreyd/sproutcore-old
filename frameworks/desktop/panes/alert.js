@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -351,7 +351,7 @@ SC.AlertPane.show = function(message, description, caption, button1Title, button
     if (title) {
       button.set('title', title).set('isVisible', YES);
       if (idx==2) {
-        button_wrapper = ret.get('buttonThreeWrapper');
+        var button_wrapper = ret.get('buttonThreeWrapper');
         button_wrapper.set('isVisible', YES);
       }
     }

@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            portions copyright @2009 Apple, Inc.
+//            portions copyright @2009 Apple Inc.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -37,6 +37,16 @@ test("the views are collapsible", function() {
 test("the thickness of the views",function(){
 	ok(view.thicknessForView(view.get('topLeftView')),'thickness of the topLeftView');
 	ok(view.thicknessForView(view.get('bottomRightView')),'thickness of the bottomRightView');
+});
+
+test("Layout direction is Horizontal",function() {
+  view.set('layoutDirection', SC.LAYOUT_HORIZONTAL) ;
+  equals(view.getPath('thumbViewCursor.cursorStyle'),"ew-resize",'The Cursor is');
+});
+
+test("Layout direction is Vertical",function() {
+  view.set('layoutDirection', SC.LAYOUT_VERTICAL) ;
+  equals(view.getPath('thumbViewCursor.cursorStyle'),"ns-resize",'The Cursor is');
 });
 
 // 

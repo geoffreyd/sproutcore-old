@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -29,8 +29,7 @@ SC.NestedStore = SC.Store.extend(
     This is set to YES when there are changes that have not been committed 
     yet.
 
-    @property
-    @type {Boolean}
+    @property {Boolean}
     @default NO
   */
   hasChanges: NO,
@@ -47,6 +46,8 @@ SC.NestedStore = SC.Store.extend(
 
   /**
     YES if the view is nested. Walk like a duck
+    
+    @property {Boolean}
   */
   isNested: YES,
 
@@ -103,26 +104,17 @@ SC.NestedStore = SC.Store.extend(
   // 
   
   /**
-    Resets a store's data hash contents to match its parent.
+    find() cannot accept REMOTE queries in a nested store.  This override will
+    verify that condition for you.  See SC.Store#find() for info on using this
+    method.
     
-    @returns {SC.Store} receiver
+    @returns {SC.Record|SC.RecordArray}
   */
-  reset: function() {
-    
-    // if we have a transient parent store, then we can just respawn from 
-    // its properties
-    var parentStore = this.get('parentStore');
-    if(parentStore) {
-      this.dataHashes = SC.beget(parentStore.dataHashes);
-      this.revisions  = SC.beget(parentStore.revisions);
-      this.statuses   = SC.beget(parentStore.statuses);
+  find: function(query) {
+    if (query && query.isQuery && query.get('location') !== SC.Query.LOCAL) {
+      throw "SC.Store#find() can only accept LOCAL queries in nested stores";
     }
-    
-    // also, reset private temporary objects
-    this.chainedChanges = this.locks = this.editables = null;
-    this.changelog = null ;
-
-    this.set('hasChanges', NO);
+    return sc_super();
   },
   
   /**
@@ -136,8 +128,10 @@ SC.NestedStore = SC.Store.extend(
     if (this.get('hasChanges')) {
       var pstore = this.get('parentStore');
       pstore.commitChangesFromNestedStore(this, this.chainedChanges, force);
-      this.reset(); // clear out custom changes
     }
+
+    // clear out custom changes - even if there is nothing to commit.
+    this.reset();
     return this ;
   },
 
@@ -166,6 +160,7 @@ SC.NestedStore = SC.Store.extend(
     }
     
     this.reset();
+    this.flush();
     return this ;
   },
   
@@ -208,6 +203,16 @@ SC.NestedStore = SC.Store.extend(
     // TODO: Notify record instances
     
     this.set('hasChanges', NO);
+  },
+  
+  /** @private
+  
+    Chain to parentstore
+  */
+  refreshQuery: function(query) {
+    var parentStore = this.get('parentStore');
+    if (parentStore) parentStore.refreshQuery(query);
+    return this ;      
   },
   
   // ..........................................................
@@ -380,6 +385,7 @@ SC.NestedStore = SC.Store.extend(
     
     // Finally, mark store as dirty if we have changes
     this.setIfChanged('hasChanges', myChanges.get('length')>0);
+    this.flush();
     
     return this ;
   },
@@ -390,9 +396,14 @@ SC.NestedStore = SC.Store.extend(
   
   
   /** @private - adapt for nested store */
-  findAll: function(queryKey, params, _store) { 
-    if (!_store) store = this;
-    return this.get('parentStore').findAll(queryKey, params, _store);
+  queryFor: function(recordType, conditions, params) {
+    return this.get('parentStore').queryFor(recordType, conditions, params);
+  },
+  
+  /** @private - adapt for nested store */
+  findAll: function(recordType, conditions, params, recordArray, _store) { 
+    if (!_store) _store = this;
+    return this.get('parentStore').findAll(recordType, conditions, params, recordArray, _store);
   },
 
   // ..........................................................

@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 /*globals TestRunner */
@@ -22,7 +22,7 @@ TestRunner.READY = SC.Responder.create({
     
     if (target) {
       var tests = target.get('tests');
-      if (tests && (tests.get('state') === SC.Record.BUSY_LOADING)) {
+      if (tests && (tests.get('status') & SC.Record.BUSY)) {
         TestRunner.makeFirstResponder(TestRunner.READY_LOADING);
       } else if (!tests || (tests.get('length')===0)) {
         TestRunner.makeFirstResponder(TestRunner.READY_NO_TESTS);

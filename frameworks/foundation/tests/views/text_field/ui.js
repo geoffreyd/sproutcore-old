@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            portions copyright @2009 Apple, Inc.
+//            portions copyright @2009 Apple Inc.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -204,6 +204,191 @@ test("enabling disabled view", function() {
   pane.verifyDisabled(view, NO);
 });
 
+// ..........................................................
+// TEST SELECTION SUPPORT
+// 
+
+test("Setting the selection to a null value should fail", function() {  
+  var view = pane.view('with value');
+  var fieldElement = view.$input()[0];
+  fieldElement.size = 10;     // Avoid Firefox 3.5 issue
+  
+  var thrownException = null;
+  try {
+    view.set('selection', null);
+  }
+  catch(e) {
+    thrownException = e;
+  }
+  ok(thrownException.indexOf !== undefined, 'an exception should have been thrown');
+  if (thrownException.indexOf !== undefined) {
+    ok(thrownException.indexOf('must specify an SC.TextSelection instance') !== -1, 'the exception should be about not specifying an SC.TextSelection instance');
+  }
+});
+
+test("Setting the selection to a non-SC.TextSelection value should fail", function() {  
+  var view = pane.view('with value');
+  var fieldElement = view.$input()[0];
+  fieldElement.size = 10;     // Avoid Firefox 3.5 issue
+  
+  var thrownException = null;
+  try {
+    view.set('selection', {start: 0, end: 0});
+  }
+  catch(e) {
+    thrownException = e;
+  }
+  ok(thrownException.indexOf !== undefined, 'an exception should have been thrown');
+  if (thrownException.indexOf !== undefined) {
+    ok(thrownException.indexOf('must specify an SC.TextSelection instance') !== -1, 'the exception should be about not specifying an SC.TextSelection instance');
+  }
+});
+
+test("Setting and then getting back the selection", function() {  
+  var view = pane.view('with value');
+  var fieldElement = view.$input()[0];
+  fieldElement.size = 10;     // Avoid Firefox 3.5 issue
+  
+  var newSelection = SC.TextSelection.create({start:2, end:5});
+  view.set('selection', newSelection);
+  
+  var fetchedSelection = view.get('selection');
+  ok(fetchedSelection.get('start') === 2, 'the selection should start at index 2');
+  ok(fetchedSelection.get('end') === 5, 'the selection should end at index 4');
+  ok(fetchedSelection.get('length') === 3, 'the selection should have length 3');
+});
+
+// ..........................................................
+// TEST ACCESSORY VIEWS
+// 
+
+test("Adding left accessory view", function() {  
+  var view = pane.view('with value');
+  
+  // test adding accessory view adds the view like it should
+  SC.RunLoop.begin();
+  var accessoryView = SC.View.create({
+    layout:  { top:1, left:2, width:16, height:16 }
+  });
+  view.set('leftAccessoryView', accessoryView);
+  SC.RunLoop.end();
+
+  ok(view.get('leftAccessoryView') === accessoryView, 'left accessory view should be set to ' + accessoryView.toString());
+  ok(view.get('childViews').length === 1, 'there should only be one child view');
+  ok(view.get('childViews')[0] === accessoryView, 'first child view should be set to ' + accessoryView.toString());
+  
+  
+  // The hint and padding elements should automatically have their 'left'
+  // values set to the accessory view's offset + width
+  // (18 = 2 left offset + 16 width)
+  var hintElement  = view.$('.sc-hint')[0];
+  var paddingElement = view.$('.padding')[0];
+  ok(hintElement.style.left  === '18px', 'hint element should get 18px left');
+  ok(paddingElement.style.left === '18px', 'padding element should get 18px left');
+  
+  // Test removing the accessory view.
+  SC.RunLoop.begin();
+  view.set('leftAccessoryView', null);
+  SC.RunLoop.end();
+  ok(view.get('childViews').length === 0, 'after removing the left accessory view there should be no child views left');
+  ok(!hintElement.style.left, 'after removing the left accessory view the hint element should have no left style');
+  ok(!paddingElement.style.left, 'after removing the left accessory view the padding element should have no left style');
+});
+
+test("Adding right accessory view", function() {  
+  var view = pane.view('with value');
+  
+  // test adding accessory view adds the view like it should
+  SC.RunLoop.begin();
+  var accessoryView = SC.View.create({
+    layout:  { top:1, right:3, width:17, height:16 }
+  });
+  view.set('rightAccessoryView', accessoryView);
+  SC.RunLoop.end();
+
+  ok(view.get('rightAccessoryView') === accessoryView, 'right accessory view should be set to ' + accessoryView.toString());
+  ok(view.get('childViews').length === 1, 'there should only be one child view');
+  ok(view.get('childViews')[0] === accessoryView, 'first child view should be set to ' + accessoryView.toString());
+  
+  
+  // The hint and padding elements should automatically have their 'right'
+  // values set to the accessory view's offset + width
+  // (20 = 3 right offset + 17 width)
+  var hintElement  = view.$('.sc-hint')[0];
+  var paddingElement = view.$('.padding')[0];
+  ok(hintElement.style.right  === '20px', 'hint element should get 20px right');
+  ok(paddingElement.style.right === '20px', 'padding element should get 20px right');
+  
+  
+  // If a right accessory view is set with only 'left' (and not 'right')
+  // defined in its layout, 'left' should be cleared out and 'right' should
+  // be set to 0.
+  SC.RunLoop.begin();
+  accessoryView = SC.View.create({
+    layout:  { top:1, left:2, width:16, height:16 }
+  });
+  view.set('rightAccessoryView', accessoryView);
+  SC.RunLoop.end();
+  
+  ok(view.get('rightAccessoryView').get('layout').left === null, "right accessory view created with 'left' rather than 'right' in layout should have layout.left set to null");
+  ok(view.get('rightAccessoryView').get('layout').right === 0, "right accessory view created with 'left' rather than 'right' in layout should have layout.right set to 0");
+  
+  
+  // Test removing the accessory view.
+  SC.RunLoop.begin();
+  view.set('rightAccessoryView', null);
+  SC.RunLoop.end();
+  ok(view.get('childViews').length === 0, 'after removing the right accessory view there should be no child views left');
+  ok(!hintElement.style.right, 'after removing the right accessory view the hint element should have no right style');
+  ok(!paddingElement.style.right, 'after removing the right accessory view the padding element should have no right style');
+});
+
+test("Adding both left and right accessory views", function() {  
+  var view = pane.view('with value');
+  
+  // test adding accessory view adds the view like it should
+  SC.RunLoop.begin();
+  var leftAccessoryView = SC.View.create({
+    layout:  { top:1, left:2, width:16, height:16 }
+  });
+  view.set('leftAccessoryView', leftAccessoryView);
+  var rightAccessoryView = SC.View.create({
+    layout:  { top:1, right:3, width:17, height:16 }
+  });
+  view.set('rightAccessoryView', rightAccessoryView);
+  SC.RunLoop.end();
+
+  ok(view.get('childViews').length === 2, 'we should have two child views since we added both a left and a right accessory view');
+  
+  
+  // The hint and padding elements should automatically have their 'left' and
+  // 'right' values set to the accessory views' offset + width
+  //   *  left:   18 = 2 left offset + 16 width)
+  //   *  right:  20 = 3 left offset + 17 width)
+  var hintElement  = view.$('.sc-hint')[0];
+  var paddingElement = view.$('.padding')[0];
+  ok(hintElement.style.left  === '18px', 'hint element should get 18px left');
+  ok(paddingElement.style.left === '18px', 'padding element should get 18px left');
+  ok(hintElement.style.right  === '20px', 'hint element should get 20px right');
+  ok(paddingElement.style.right === '20px', 'padding element should get 20px right');
+  
+  
+  // Test removing the accessory views.
+  SC.RunLoop.begin();
+  view.set('rightAccessoryView', null);
+  SC.RunLoop.end();
+  ok(view.get('childViews').length === 1, 'after removing the right accessory view there should be one child view left (the left accessory view)');
+  ok(!hintElement.style.right, 'after removing the right accessory view the hint element should have no right style');
+  ok(!paddingElement.style.right, 'after removing the right accessory view the padding element should have no right style');
+  SC.RunLoop.begin();
+  view.set('leftAccessoryView', null);
+  SC.RunLoop.end();
+  ok(view.get('childViews').length === 0, 'after removing both accessory views there should be no child views left');
+  ok(!hintElement.style.left, 'after removing the left accessory view the hint element should have no left style');
+  ok(!paddingElement.style.left, 'after removing the left accessory view the padding element should have no left style');
+});
+
+
 
 // ..........................................................
 // TEST EVENTS
@@ -244,7 +429,18 @@ test("focus and blurring text field", function() {
   }, 100);  
   
 });
+
+test("editing a field should not change the cursor position", function() {
+  var textField = pane.view('empty');
+  var input = textField.$('input');
+  input.val('John Doe');
+  textField.set('selection', SC.TextSelection.create({start:2, end:3}));
+  SC.Event.trigger(input, 'change');
+
+  ok(input.val() === 'John Doe', 'input value should be \'John Doe\'');
+  var selection = textField.get('selection');
+  console.log("Selection:  %@".fmt(selection));
+  ok(selection.get('start') == 2 && selection.get('end') == 3, 'cursor position should be unchanged');
+});
+
 })();
-
-
-

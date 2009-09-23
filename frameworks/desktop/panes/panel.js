@@ -1,7 +1,7 @@
 // ========================================================================
 // SproutCore -- JavaScript Application Framework
 // Copyright ©2006-2008, Sprout Systems, Inc. and contributors.
-// Portions copyright ©2008 Apple, Inc.  All rights reserved.
+// Portions copyright ©2008 Apple Inc.  All rights reserved.
 // ========================================================================
 
 sc_require('panes/modal');
@@ -48,7 +48,7 @@ SC.PanelPane = SC.Pane.extend({
 
   /**
     The modal pane to place behind this pane if this pane is modal.  This 
-    must be a subclass or a insance of SC.ModalPane.
+    must be a subclass or an instance of SC.ModalPane.
   */
   modalPane: SC.ModalPane.extend({
     classNames: 'for-sc-panel'
@@ -99,11 +99,11 @@ SC.PanelPane = SC.Pane.extend({
   /** @private */
   createChildViews: function() {
     // if contentView is defined, then create the content
-     var view = this.contentView ;
-        if (view) {
-          view = this.contentView = this.createChildView(view) ;
-          this.childViews = [view] ;
-        }
+    var view = this.contentView ;
+    if (view) {
+      view = this.contentView = this.createChildView(view) ;
+      this.childViews = [view] ;
+    }
   },
 
   

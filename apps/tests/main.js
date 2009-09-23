@@ -1,6 +1,6 @@
 // ==========================================================================
 // Project:   TestRunner
-// Copyright: ©2009 My Company, Inc.
+// Copyright: ©2009 Apple Inc.
 // ==========================================================================
 /*globals TestRunner */
 
@@ -20,7 +20,7 @@ TestRunner.main = function main() {
   TestRunner.makeFirstResponder(TestRunner.START);
 
   // load initial data
-  //var targets = TestRunner.store.findAll(TestRunner.Target);
+  //var targets = TestRunner.store.findAll(CoreTools.Target);
   //TestRunner.targetsController.set('content', targets);
 
 } ;

@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -103,11 +103,11 @@ SC.TabView = SC.View.extend(
     
     if (this.get('tabLocation') === SC.TOP_LOCATION) {
       ContainerView = this.containerView.extend({
-        layout: { top:11, left:0, right:0, bottom: 0 }
+        layout: { top:12, left:0, right:0, bottom: 0 }
       });
     } else {
       ContainerView = this.containerView.extend({
-        layout: { top:0, left:0, right:0, bottom: 11 }
+        layout: { top:0, left:0, right:0, bottom: 12 }
       });
     }
     
@@ -142,7 +142,7 @@ SC.TabView = SC.View.extend(
     it.
   */
   segmentedView: SC.SegmentedView.extend({
-    layout: { left: 0, right: 0, height: 23 },
+    layout: { left: 0, right: 0, height: 24 },
 
     /** @private
       When the value changes, update the parentView's value as well.

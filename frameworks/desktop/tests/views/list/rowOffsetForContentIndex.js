@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            portions copyright @2009 Apple, Inc.
+//            portions copyright @2009 Apple Inc.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -42,7 +42,6 @@ function verifyRowOffsets(view, rowHeight, expected) {
   var loc = view.get('length'), actual, idx, cur=0;
   
   for(idx=0;idx<loc;idx++) {
-    //if (SC.stopIt) debugger ;
     actual = view.rowOffsetForContentIndex(idx);
     equals(actual, cur, "content.rowHeightForContentIndex(%@) should be expected offset".fmt(idx));
     cur += expected ? expected[idx] : rowHeight;

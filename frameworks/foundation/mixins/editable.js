@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -45,6 +45,8 @@ SC.Editable = {
     Indicates whether a view is editable or not.  You can optionally 
     implement the methods in this mixin to disallow editing is isEditable is
     NO.
+    
+    @property {Boolean}
   */
   isEditable: NO,
   
@@ -52,6 +54,8 @@ SC.Editable = {
     Indicates whether editing is currently in progress.  The methods you
     implement should generally up this property as appropriate when you 
     begin and end editing.
+    
+    @property {Boolean}
   */
   isEditing: NO,
   

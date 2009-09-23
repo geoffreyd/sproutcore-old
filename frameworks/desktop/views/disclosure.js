@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -38,7 +38,23 @@ SC.DisclosureView = SC.ButtonView.extend(
   /** @private */
   render: function(context, firstTime) {
     context.push('<img src="', SC.BLANK_IMAGE_URL, '" class="button" alt="" />');
-    context.push('<label>',this.get('displayTitle'),'</label>');
+    if(this.get('needsEllipsis')){
+      context.push('<label class="ellipsis">',this.get('displayTitle'),'</label>');
+    }else{
+        context.push('<label>',this.get('displayTitle'),'</label>');  
+    }
+  },
+  
+  keyDown: function(evt) {
+    if (evt.which === 37 || evt.which === 38) {  
+      this.set('value', this.get('toggleOffValue')) ;
+      return YES;
+    }
+    if (evt.which === 39 || evt.which === 40) {  
+      this.set('value', this.get('toggleOnValue')) ;
+      return YES;
+    }     
+    sc_super(); 
   }
   
 });

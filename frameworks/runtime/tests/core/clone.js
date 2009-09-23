@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore Costello - Property Observing Library
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -64,3 +64,21 @@ test("should return a cloned array ", function() {
 		
 });
 
+test("should use copy() if isCopyable", function() {
+  var obj = SC.Object.create(SC.Copyable, {
+    isCopy: NO,
+    
+    copy: function() {
+      return SC.Object.create(SC.Copyable, { isCopy: YES });
+    }
+    
+  });
+  
+  var copy = SC.clone(obj);
+  ok(!!copy, 'clone should return a copy');
+  equals(copy.isCopy, YES, 'copy.isCopy should be YES');
+});
+
+test("SC.copy should be an alias for SC.clone", function() {
+  equals(SC.copy, SC.clone, 'SC.copy should equal SC.clone');
+});

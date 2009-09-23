@@ -1,7 +1,7 @@
 // ==========================================================================
 // Project:   SproutCore - JavaScript Application Framework
 // Copyright: ©2006-2009 Sprout Systems, Inc. and contributors.
-//            Portions ©2008-2009 Apple, Inc. All rights reserved.
+//            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
@@ -12,7 +12,7 @@ sc_require('models/record_attribute');
 
   Describes a single attribute that is fetched dynamically from the server
   when you request it.  Normally getting a property value with this attribute
-  applied will cause call the findAll() method on the record store passing
+  applied will cause call the find() method on the record store passing
   the attribute record type as the query key along with the property value,
   owner record, and property key name as parameters. 
   
@@ -26,13 +26,13 @@ sc_require('models/record_attribute');
   @since SproutCore 1.0
 */
 SC.FetchedAttribute = SC.RecordAttribute.extend(
-  /** @scipe SC.FetchedAttribute.prototype */ {
+  /** @scope SC.FetchedAttribute.prototype */ {
 
   /**
     Define the param key that will be passed to the findAll method on the
     store.  If null, the param will not be send.  Defaults to 'link'
     
-    @param {String}
+    @property {String}
   */
   paramValueKey: 'link',
 
@@ -40,23 +40,31 @@ SC.FetchedAttribute = SC.RecordAttribute.extend(
     Define the param key used to send the parent record.  If null the param
     will not be sent.  Defaults to 'owner'.
     
-    @param {String}
+    @property {String}
   */
   paramOwnerKey: 'owner',
   
   /**
     Define the param key used to send the key name used to reference this 
     attribute.  If null, the param will not be sent.  Defaults to "rel"
+    
+    @property {String}
   */
   paramRelKey: 'rel',
   
   /**
     Optional query key to pass to findAll.  Otherwise type class will be 
     passed.
+    
+    @property {String}
   */
   queryKey: null,
 
-  /** Fetched attributes are not editable */
+  /** 
+    Fetched attributes are not editable 
+    
+    @property {Boolean}
+  */
   isEditable: NO,  
   
   // ..........................................................
