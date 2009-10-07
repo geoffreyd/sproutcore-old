@@ -161,7 +161,7 @@ SC.ListItemView = SC.View.extend(
     
     // handle disclosure triangle
     value = this.get('disclosureState');
-    hideDisclosure = (content.get ? content.get('hideDisclosure') : content['hideDisclosure']) ;
+    hideDisclosure = (content ? (content.get ? content.get('hideDisclosure') : content['hideDisclosure']) : NO ) ;
     if (value !== SC.LEAF_NODE && !hideDisclosure) {
       this.renderDisclosure(working, value);
       context.addClass('has-disclosure');

@@ -693,7 +693,7 @@ SC.SplitView = SC.View.extend(
   init: function() {
     sc_super() ;
     
-    this.layoutView = this ;
+    // this.layoutView = this ;
     
     var ary = this.get('childLayoutProperties') || [], len = ary.length, idx,
       fun = function() {

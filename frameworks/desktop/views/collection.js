@@ -1143,7 +1143,7 @@ SC.CollectionView = SC.View.extend(
         diff ;
 
     // save new last
-    this._cv_selindexes = sel ? sel.frozenCopy() : null;
+    this._cv_selindexes = (sel && sel.frozenCopy) ? sel.frozenCopy() : null;
 
     // determine which indexes are now invalid
     if (last) last = last.indexSetForSource(content);
