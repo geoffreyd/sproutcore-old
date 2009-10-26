@@ -95,6 +95,8 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
     accessory view wider, with empty space on the left.
   */
   rightAccessoryView: null,
+  
+  _isFocused: NO,
 
 
   /** isEditable maps to isEnabled with a TextField. */
@@ -115,12 +117,14 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
   */
   selection: function(key, value) {
     var element = this.$input().get(0) ;
+    var range, start, end;
 
     // Are we being asked to set the value, or return the current value?
     if (value === undefined) {
       // The client is retrieving the value.
       if (element) {
-        var start = null, end = null ;
+        start = null;
+        end = null;
 
         if (!element.value) {
           start = end = 0 ;
@@ -140,7 +144,7 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
             if (selection) {
               var type = selection.type ;
               if (type  &&  (type === 'None'  ||  type === 'Text')) {
-                var range = selection.createRange() ;
+                range = selection.createRange() ;
 
                 if (!this.get('isTextArea')) {
                   // Input tag support.  Figure out the starting position by
@@ -194,8 +198,8 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
 
         // Support Internet Explorer.
         if (!setStart  ||  !setEnd) {
-         var range = element.createTextRange() ;
-         var start = value.get('start') ;
+         range = element.createTextRange() ;
+         start = value.get('start') ;
          range.move('character', start) ;
          range.moveEnd('character', value.get('end') - start) ;
          range.select() ;
@@ -334,15 +338,29 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
     if (rightAdjustment) rightAdjustment += 'px' ;
 
     this._renderField(context, firstTime, v, leftAdjustment, rightAdjustment) ;
+    if(SC.browser.mozilla) this.invokeLast(this._applyFirefoxCursorFix);
   },
 
+
+  /**
+    If isTextArea is changed (this might happen in inlineeditor constantly)
+    force the field render to render like the firsttime to avoid writing extra
+    code. This can be useful also 
+  */
+  _forceRenderFirstTime: NO,
+    
+  _renderFieldLikeFirstTime: function(){
+    this.set('_forceRenderFirstTime', YES);
+  }.observes('isTextArea'),
+  
   _renderField: function(context, firstTime, value, leftAdjustment, rightAdjustment) {
     // TODO:  The cleanest thing might be to create a sub- rendering context
     //        here, but currently SC.RenderContext will render sibling
     //        contexts as parent/child.
     var hint = this.get('hint') ;
     
-    if (firstTime) {
+    if (firstTime || this._forceRenderFirstTime) {
+      this._forceRenderFirstTime = NO;
       var disabled = this.get('isEnabled') ? '' : 'disabled="disabled"' ;
       var name = SC.guidFor(this) ;
       
@@ -364,7 +382,7 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
       
       // Render the input/textarea field itself, and close off the padding.
       if (this.get('isTextArea')) {
-        context.push('<textarea name="%@" %@ value="%@"></textarea></span>'.fmt(name, disabled, value)) ;
+        context.push('<textarea name="%@" %@>%@</textarea></span>'.fmt(name, disabled, value)) ;
       }
       else {
         var type = this.get('isPassword') ? 'password' : 'text' ;
@@ -415,9 +433,11 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
         // Firefox needs a bit of help to recalculate the width of the text
         // field, if it has focus.  (Even though it's set to 100% of its
         // parent, if we adjust the parent it doesn't always adjust in kind.)
-        if (SC.browser.mozilla) {
-          element.style.width = paddingElement.clientWidth + "px";
-        }
+        // if (SC.browser.mozilla) {
+        //           if(paddingElement.clientWidth>0){
+        //             element.style.width = paddingElement.clientWidth + "px";
+        //           }
+        //         }
       }
     }
   },
@@ -465,6 +485,12 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
     // our key/mouse down/up handlers (such as the user choosing Select All
     // from a menu).
     SC.Event.add(input, 'select', this, this._textField_selectionDidChange);
+    
+    if(SC.browser.mozilla){
+      // cache references to layer items to improve firefox hack perf
+       this._cacheInputElement = this.$input();
+       this._cachePaddingElement = this.$('.padding');
+    }
   },
 
   willDestroyLayer: function() {
@@ -487,48 +513,61 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
     this.fieldDidBlur();
     SC.RunLoop.end();
   },
-
+  
   fieldDidFocus: function(evt) {
-    if (!this._isFocused) {
-      this._isFocused = YES ;
-      this.beginEditing();
-    }
+    this.beginEditing();
+  },
+  
+  fieldDidBlur: function() {
+    this.commitEditing();
   },
 
-  fieldDidBlur: function() {
-    //if (this._isFocused) {
-      this._isFocused = NO ;
-      this.commitEditing();
-    //}
-  },
+  /**
+    Move magic number out so it can be over-written later in inline editor
+  */
+  _topOffsetForFirefoxCursorFix: 3,
 
   _applyFirefoxCursorFix: function() {
-    this._applyTimer = null; // clear
-    if (this._hasFirefoxCursorFix) return this;
+    // Be extremely careful changing this code.  !!!!!!!! 
+    // Contact me if you need to change or improve the code. After several 
+    // iterations the new way to apply the fix seems to be the most 
+    // consistent.
+    // This fixes: selection visibility, cursor visibility, and the ability 
+    // to fix the cursor at any position. As of FF 3.5.3 mozilla hasn't fixed this 
+    // bug, even though related bugs that I've found on their database appear
+    // as fixed.  
+    // 
+    // Juan Pinzon
+    
     if (SC.browser.mozilla) {
-      this._hasFirefoxCursorFix = YES ;
-
-      var element = this.$input();
-      var layer = element[0];
-      var p = SC.$(layer).offset() ;
-      var top    = p.top,
-          left   = p.left,
-          width  = layer.offsetWidth,
-          height = layer.offsetHeight ;
-
-      var style = 'position: fixed; top: %@px; left: %@px; width: %@px; height: %@px;'.fmt(top, left, width, height) ;
-      element.attr('style', style) ;
+      var top, left, width, height, p, layer, element, textfield;
+      
+      // I'm caching in didCreateLayer this elements to improve perf
+      element = this._cacheInputElement;
+      textfield = this._cachePaddingElement;
+      if(textfield && textfield[0]){
+        layer = textfield[0];
+        p = SC.$(layer).offset() ;
+      
+        // this is to take into account an styling issue.
+        if(element[0].tagName.toLowerCase()==="input") {
+          top = p.top+this._topOffsetForFirefoxCursorFix; 
+        }
+        else top = p.top;
+        left = p.left;
+        width = layer.offsetWidth;
+        height = layer.offsetHeight ;
+      
+        var style = 'position: fixed; top: %@px; left: %@px; width: %@px; height: %@px;'.fmt(top, left, width, height) ;
+        // if the style is the same don't re-apply
+        if(!this._prevStyle || this._prevStyle!=style) element.attr('style', style) ;
+        this._prevStyle = style;
+      }
     }
     return this ;
   },
-
-  _removeFirefoxCursorFix: function() {
-    if (!this._hasFirefoxCursorFix) return this;
-    this._hasFirefoxCursorFix = NO ;
-    if (SC.browser.mozilla) this.$input().attr('style', '') ;
-    return this ;
-  },
-
+  
+  
   _textField_selectionDidChange: function() {
     this.notifyPropertyChange('selection');
   },
@@ -544,20 +583,19 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
   // hide the hint text.
   /** @private */
   willBecomeKeyResponderFrom: function(keyView) {
-    // focus the text field.
-    if (!this._isFocused) {
-      this._isFocused = YES ;
-      this.becomeFirstResponder();
-      if (this.get('isVisibleInWindow')) {
-        this.$input()[0].focus();
-        this._applyFirefoxCursorFix();
-
-        if(!this._txtFieldMouseDown){
-          if(!SC.browser.safari) this.invokeOnce(this._selectRootElement) ;
-          else this.invokeLater(this._selectRootElement, 1) ;
-        }
+    if(this.get('isVisibleInWindow')) {
+      this.$input()[0].focus();
+      
+      if(!this._txtFieldMouseDown){
+        if(SC.browser.mozilla) this.invokeOnce(this._selectRootElement) ;
+        else if(SC.browser.safari) this.invokeLater(this._selectRootElement, 1) ; 
+        else this._selectRootElement();
       }
     }
+  },
+  
+  willLoseKeyResponderTo: function(responder) {
+    //if (this._isFocused) this._isFocused = NO ;
   },
 
   // In IE, you can't modify functions on DOM elements so we need to wrap the
@@ -570,43 +608,38 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
   // the hint text if needed.
   /** @private */
   didLoseKeyResponderTo: function(keyView) {
-    if (this._isFocused) {
-      this._isFocused = NO ;
-      this.$input()[0].blur() ;
-    } else {
-      this.fieldValueDidChange() ;
-    }
-    if(this._hasFirefoxCursorFix) this._removeFirefoxCursorFix();
+    this.$input()[0].blur() ;
   },
 
   parentViewDidResize: function() {
-    if (SC.browser.mozilla && this.get('isFirstResponder')) {
-      this._removeFirefoxCursorFix();
-      if (this._applyTimer) this._applyTimer.invalidate();
-      this._applyTimer = this.invokeLater(this._applyFirefoxCursorFix, 250);
+    if (SC.browser.mozilla) {
+      this.invokeLast(this._applyFirefoxCursorFix);
     }
-
     sc_super();
   },
 
-  _isFocused: false,
 
   /** @private
     Simply allow keyDown & keyUp to pass through to the default web browser
     implementation.
   */
   keyDown: function(evt) {
-
     // handle return and escape.  this way they can be passed on to the
     // responder chain.
     if ((evt.which === 13) && !this.get('isTextArea')) return NO ;
     if (evt.which === 27) return NO ;
 
     // handle tab key
-    if (evt.which === 9 && !this.get('isMultiline')) {
+    if (evt.which === 9 && !this.get('isTextArea')) {
       var view = evt.shiftKey ? this.get('previousValidKeyView') : this.get('nextValidKeyView');
       view.becomeFirstResponder();
       return YES ; // handled
+    }
+    
+    // handle delete key, set dontForceDeleteKey to allow the default behavior
+    // of the delete key.
+    if (evt.which === 8){
+      evt.dontForceDeleteKey=YES;
     }
 
     // validate keyDown...
@@ -621,6 +654,7 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
   },
 
   keyUp: function(evt) {
+    
     // The caret/selection could have moved.  In some browsers, though, the
     // element's values won't be updated until after this event is finished
     // processing.
@@ -640,7 +674,13 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
     if (!this.get('isEnabled')) {
       evt.stop();
       return YES;
-    } else return sc_super();
+    } else if((this.value && this.value.length===0) || !this.value) {
+      return YES;
+    } else {
+      // This fixes the double click issue in firefox
+      if(SC.browser.mozilla) this.$input()[0].focus();
+      return sc_super();
+    }
   },
 
   mouseUp: function(evt) {
@@ -652,6 +692,9 @@ SC.TextFieldView = SC.FieldView.extend(SC.StaticLayout, SC.Editable,
 
     if (!this.get('isEnabled')) {
       evt.stop();
+      return YES;
+    } else if((this.value && this.value.length===0) || !this.value) {
+      this.$input()[0].focus();
       return YES;
     } else return sc_super();
   },

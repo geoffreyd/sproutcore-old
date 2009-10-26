@@ -482,8 +482,36 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
     this.set('layerLocationNeedsUpdate', YES) ;
     this.invokeOnce(this.updateLayerLocationIfNeeded) ;
     
+    // We also need to iterate down through the view hierarchy and invalidate
+    // all our child view's caches for 'pane', since it could have changed.
+    //
+    // Note:  In theory we could try to avoid this invalidation if we
+    //        do this only in cases where we "know" the 'pane' value might
+    //        have changed, but those cases are few and far between.
+    
+    this._invalidatePaneCacheForSelfAndAllChildViews();
+    
     return this ;
   }.observes('isVisible'),
+  
+  /** @private
+    We want to cache the 'pane' property, but it's impossible for us to
+    declare a dependence on all properties that can affect the value.  (For
+    example, if our grandparent gets attached to a new pane, our pane will
+    have changed.)  So when there's the potential for the pane changing, we
+    need to invalidate the caches for all our child views, and their child
+    views, and so on.
+  */
+  _invalidatePaneCacheForSelfAndAllChildViews: function () {
+    this.notifyPropertyChange('pane');
+    
+    var childViews = this.get('childViews');
+    var len = childViews.length ;
+    for (var idx=0; idx<len; ++idx) {
+      var childView = childViews[idx];
+      if (childView._invalidatePaneCacheForSelfAndAllChildViews) childView._invalidatePaneCacheForSelfAndAllChildViews();
+    }
+  },
   
   // ..........................................................
   // LAYER SUPPORT
@@ -599,7 +627,7 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
       while(q.length!==0){
         node=q[0];
         q.shift();
-        if(node.id==layerId){
+        if(node.id===layerId){
           found=true;
           elem=node;
           break;
@@ -1146,7 +1174,7 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
     @returns {Object} object that handled event, if any
   */
   interpretKeyEvents: function(event) {
-    var codes = event.commandCodes(), cmd = codes[0], chr = codes[1];
+    var codes = event.commandCodes(), cmd = codes[0], chr = codes[1], ret;
 
     if (!cmd && !chr) return null ;  //nothing to do.
 
@@ -1166,7 +1194,8 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
       // if we haven't returned yet and there is plain text, then do an insert 
       // of the text.  Since this is not an action, do not send it up the 
       // responder chain.
-     return this.insertText(chr);
+      ret = this.insertText(chr, event);
+      return ret ? (ret===YES ? this : ret) : null ; // map YES|NO => this|nil
     }
 
     return null ; //nothing to do.
@@ -1179,7 +1208,7 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
     @returns {Object} receiver or object that handled event
   */
   insertText: function(chr) {
-    return this ;
+    return NO ;
   },
     
   /**
@@ -1324,8 +1353,10 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
       SC.View.views[this.get('layerId')] = this ;
     }
     
+    var childViews = this.get('childViews');
+    
     // setup child views.  be sure to clone the child views array first
-    this.childViews = this.childViews ? this.childViews.slice() : [] ;
+    this.childViews = childViews ? childViews.slice() : [] ;
     this.createChildViews() ; // setup child Views
     
     // register display property observers ..
@@ -1602,6 +1633,10 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
   convertFrameToView: function(frame, targetView) {
     var myX=0, myY=0, targetX=0, targetY=0, view = this, f ;
     
+    if (this.get('useStaticLayout')) {
+      throw "convertFrameToView is not available with static layout";
+    }
+    
     // walk up this side
     while (view) {
       f = view.get('frame'); myX += f.x; myY += f.y ;
@@ -1644,6 +1679,10 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
   convertFrameFromView: function(frame, targetView) {
     var myX=0, myY=0, targetX=0, targetY=0, view = this, next, f ;
     
+    if (this.get('useStaticLayout')) {
+      throw "convertFrameToView is not available with static layout";
+    }
+    
     // walk up this side
     while (view) {
       f = view.get('frame'); myX += f.x; myY += f.y ;
@@ -1666,6 +1705,26 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
   },
   
   /**
+    Attempt to scroll the view to visible.  This will walk up the parent
+    view hierarchy looking looking for a scrollable view.  It will then 
+    call scrollToVisible() on it.
+    
+    Returns YES if an actual scroll took place, no otherwise.
+    
+    @returns {Boolean} 
+  */
+  scrollToVisible: function() {
+    var pv = this.get('parentView');
+    while(pv && !pv.get('isScrollable')) pv = pv.get('parentView');
+    
+    // found view, first make it scroll itself visible then scroll this.
+    if (pv) {
+      pv.scrollToVisible();
+      return pv.scrollToVisible(this);
+    } else return NO ;
+  },
+  
+  /**
     Frame describes the current bounding rect for your view.  This is always
     measured from the top-left corner of the parent view.
     
@@ -1674,7 +1733,7 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
   */
   frame: function() {
     return this.computeFrameWithParentFrame(null) ;
-  }.property('layout').cacheable(),
+  }.property('layout', 'useStaticLayout').cacheable(),
   
   /**
     Computes what the frame of this view would be if the parent were resized
@@ -1711,6 +1770,8 @@ SC.View = SC.Responder.extend(SC.DelegateSupport,
       console.error(error.toString())  ;
       throw error ;
     }
+    
+    if (stLayout) return null; // can't compute
     
     // handle left aligned and left/right 
     if (!SC.none(layout.left)) {

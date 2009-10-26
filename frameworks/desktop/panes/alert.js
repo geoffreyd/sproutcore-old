@@ -27,7 +27,7 @@ SC.BUTTON2_STATUS = 'button2';
 */
 SC.BUTTON3_STATUS = 'button3';
 
-/**
+/** @class
   Displays a preformatted modal alert pane.
   
   Alert panes are a simple way to provide modal messaging that otherwise 
@@ -222,7 +222,7 @@ SC.AlertPane = SC.PanelPane.extend({
           context.begin('h1').text(pane.get('message') || '').end();
           context.push(pane.get('displayDescription') || '');
           context.push(pane.get('displayCaption') || '');
-          context.push('<div class="seperator"></div>');
+          context.push('<div class="separator"></div>');
         }
       }),
 

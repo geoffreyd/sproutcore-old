@@ -68,7 +68,7 @@ test("raises exception if you try to write an attribute before an attribute hash
   store.removeDataHash(foo.storeKey);
   equals(store.readDataHash(foo.storeKey), null, 'precond - should not have store key');
   
-  var e, cnt=0 ;
+  var cnt=0 ;
   try {
     foo.writeAttribute("foo", "bar");
   } catch(e) {
@@ -95,3 +95,18 @@ test("Writing to an attribute in chained store sets correct status", function() 
   
 });
 
+
+test("Writing a new guid", function(){
+  equals(foo.get('id'), 1, 'foo.id should be 1');
+  foo.set('guid', 2);
+  equals(foo.get('id'), 2, 'foo.id should be 2');
+});
+
+test("Writing primaryKey of 'id'", function(){
+  PrimaryKeyId = SC.Record.extend({ primaryKey: 'id' });
+  var foo2 = store.createRecord(PrimaryKeyId, { id: 1 });
+
+  equals(foo2.get('id'), 1, 'foo2.id should be 1');
+  foo2.set('id', 2);
+  equals(foo2.get('id'), 2, 'foo2.id should be 2');
+});

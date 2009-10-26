@@ -6,15 +6,12 @@
 # License:   Licened under MIT license (see license.js)
 # ==========================================================================
 #
-# This file contains bootstrap code to be included at the top of standard 
-# SproutCore apps.  This code will autodetect the browser and then adds
-# a class name to the 'body' tag.  You can use this class name to customize
-# the CSS rules to be applied to your page based on browser.  The class name
-# contains the name webkit|mozilla|ie + the major version number
+# IMPORTANT: This bootstrap code is DEPRECATED.  Instead see the bootstrap 
+# framework in sproutcore for all new apps.
 #
 -%>
 <% content_for('bootstrap') do %>
-var SC = SC || { BUNDLE_INFO: {} };
+var SC = SC || { BUNDLE_INFO: {}, LAZY_INSTANTIATION: {} };
 SC.browser = (function() {
   var userAgent = navigator.userAgent.toLowerCase();
   var version = (userAgent.match( /.+(?:rv|it|ra|ie)[\/: ]([\d.]+)/ ) || [])[1] ;

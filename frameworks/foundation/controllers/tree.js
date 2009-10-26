@@ -99,7 +99,26 @@ SC.TreeController = SC.ObjectController.extend(SC.SelectionSupport,
   
   _sctc_arrangedObjectsContentDidChange: function() {
     this.updateSelectionAfterContentChange();
-  }.observes('*arrangedObjects.[]')
+  }.observes('*arrangedObjects.[]'),
+  
+  /**
+    @private
+    
+    Returns the first item in arrangeObjects that is not a group.  This uses
+    a brute force approach right now; we assume you probably don't have a lot
+    of groups up front.
+  */
+  firstSelectableObject: function() {
+    var objects = this.get('arrangedObjects'),
+        indexes, len, idx     = 0;
+        
+    if (!objects) return null; // fast track
+    
+    indexes = objects.contentGroupIndexes(null, objects);
+    len = objects.get('length');
+    while(indexes.contains(idx) && (idx<len)) idx++;
+    return idx>=len ? null : objects.objectAt(idx);
+  }.property()
   
 });
 

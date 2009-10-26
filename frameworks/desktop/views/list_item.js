@@ -13,8 +13,8 @@ SC.LIST_ITEM_ACTION_EJECT = 'sc-list-item-cancel-eject';
   @class
   
   Many times list items need to display a lot more than just a label of text.
-  You often need to include checkboxes, icons, extra counts and an action or 
-  warning icon to the far right. 
+  You often need to include checkboxes, icons, right icons, extra counts and 
+  an action or warning icon to the far right. 
   
   A ListItemView can implement all of this for you in a more efficient way 
   than you might get if you simply put together a list item on your own using
@@ -51,6 +51,14 @@ SC.ListItemView = SC.View.extend(
     space will be left for the icon next to the list item view.
   */
   hasContentIcon: NO,
+
+  /**
+    (displayDelegate) True if you want the item view to display a right icon.
+    
+    If false, the icon on the list item view will be hidden.  Otherwise,
+    space will be left for the icon next to the list item view.
+  */
+  hasContentRightIcon: NO,
   
   /**
     (displayDelegate) True if you want space to be allocated for a branch 
@@ -76,6 +84,14 @@ SC.ListItemView = SC.View.extend(
     icon to display.  It must return either a URL or a CSS class name.
   */
   contentIconKey: null,
+ 
+  /**
+    (displayDelegate) Property key to use for the right icon url
+
+    This property will be checked on the content object to determine the 
+    icon to display.  It must return either a URL or a CSS class name.
+  */
+  contentRightIconKey: null,
   
   /**
     (displayDelegate) The name of the property used for label itself
@@ -135,7 +151,7 @@ SC.ListItemView = SC.View.extend(
   disclosureState: SC.LEAF_NODE,
   
   contentPropertyDidChange: function() {
-    if (this.get('isEditing')) this.discardEditing() ;
+    //if (this.get('isEditing')) this.discardEditing() ;
     this.displayDidChange();
   },
   
@@ -158,6 +174,13 @@ SC.ListItemView = SC.View.extend(
     // outline level wrapper
     working = context.begin("div").addClass("sc-outline");
     if (level>=0 && indent>0) working.addStyle("left", indent*(level+1));
+    
+    // add alternating row classes
+    if (this.get('contentIndex') % 2 === 0) {
+      context.addClass('even');
+    } else {
+      context.addClass('odd');
+    }
     
     // handle disclosure triangle
     value = this.get('disclosureState');
@@ -191,11 +214,25 @@ SC.ListItemView = SC.View.extend(
     if (value && SC.typeOf(value) !== SC.T_STRING) value = value.toString();
     if (this.get('escapeHTML')) value = SC.RenderContext.escapeHTML(value);
     this.renderLabel(working, value);
+
+    // handle right icon
+    if (this.getDelegateProperty('hasContentRightIcon', del)) {
+      key = this.getDelegateProperty('contentRightIconKey', del) ;
+      value = (key && content) ? (content.get ? content.get(key) : content[key]) : null ;
+      
+      this.renderRightIcon(working, value);
+      context.addClass('has-right-icon');
+    }
     
     // handle unread count
     key = this.getDelegateProperty('contentUnreadCountKey', del) ;
     value = (key && content) ? (content.get ? content.get(key) : content[key]) : null ;
-    if (!SC.none(value) && (value !== 0)) this.renderCount(working, value) ;
+    if (!SC.none(value) && (value !== 0)) {
+      this.renderCount(working, value) ;
+      var digits = ['zero', 'one', 'two', 'three', 'four', 'five'];
+      var digit = (value.toString().length < digits.length) ? digits[value.toString().length] : digits[digits.length-1];
+      context.addClass('has-count %@-digit'.fmt(digit));
+    }
     
     // handle action 
     key = this.getDelegateProperty('listItemActionProperty', del) ;
@@ -275,7 +312,7 @@ SC.ListItemView = SC.View.extend(
 
       // now add inner content.  note we do not add a real checkbox because
       // we don't want to have to setup a change observer on it.
-      tmp.push('<img src="', SC.BLANK_IMAGE_URL, '" class="button" />');
+      tmp.push('<span class="button"></span>');
 
       // apply edit
       html = cache[key] = tmp.join();
@@ -331,6 +368,31 @@ SC.ListItemView = SC.View.extend(
   */
   $label: function() {
     return this.$('label') ;
+  },
+
+  /** 
+    Generates a right icon for the label based on the content.  This method will
+    only be called if the list item view has icons enabled.  You can override
+    this method to display your own type of icon if desired.
+    
+    @param {SC.RenderContext} context the render context
+    @param {String} icon a URL or class name.
+    @returns {void}
+  */
+  renderRightIcon: function(context, icon){
+    // get a class name and url to include if relevant
+    var url = null, className = null ;
+    if (icon && SC.ImageView.valueIsUrl(icon)) {
+      url = icon; className = '' ;
+    } else {
+      className = icon; url = SC.BLANK_IMAGE_URL ;
+    }
+    
+    // generate the img element...
+    context.begin('img')
+      .addClass('right-icon').addClass(className)
+      .attr('src', url)
+    .end();
   },
   
   /** 
@@ -560,58 +622,81 @@ SC.ListItemView = SC.View.extend(
   },
   
   beginEditing: function() {
-   if (this.get('isEditing')) return YES ;
-   
-   var content = this.get('content') ;
-   var del = this.displayDelegate ;
-   var labelKey = this.getDelegateProperty('contentValueKey', del) ;
-   var v = (labelKey && content && content.get) ? content.get(labelKey) : null ;
-   
-   var f= this.computeFrameWithParentFrame(null);
-   var parent = this.get('parentView');
-   var pf = parent.get('frame');
-   var el = this.$label() ;
-   var offset = SC.viewportOffset(el[0]);
-   if (!el || el.get('length')===0) return NO ;
-   
-   // if the label has a large line height, try to adjust it to something
-   // more reasonable so that it looks right when we show the popup editor.
-   var oldLineHeight = el.css('lineHeight');
-   var fontSize = el.css('fontSize');
-   var top = this.$().css('top');
-   if(top) top = parseInt(top.substring(0,top.length-2),0);
-   else top =0;
-   var lineHeight = oldLineHeight;
-   var lineHeightShift = 0;
-   
-   if (fontSize && lineHeight) {
-     var targetLineHeight = fontSize * 1.5 ;
-     if (targetLineHeight < lineHeight) {
-       el.css({ lineHeight: '1.5' });
-       lineHeightShift = (lineHeight - targetLineHeight) / 2; 
-     } else oldLineHeight = null ;
-   }
-   
-   f.x = offset.x;
-   f.y = offset.y+top + lineHeightShift ;
-   f.height = el[0].offsetHeight ;
-   f.width = (f.width - 40 - el[0].offsetLeft) ;
-   
-   var ret = SC.InlineTextFieldView.beginEditing({
-     frame: f, 
-     exampleElement: el, 
-     delegate: this, 
-     value: v,
-     multiline: NO,
-     isCollection: YES
-   }) ;
-   
-   // restore old line height for original item if the old line height 
-   // was saved.
-   if (oldLineHeight) el.css({ lineHeight: oldLineHeight }) ;
-   
-   // Done!  If this failed, then set editing back to no.
-   return ret ;
+    if (this.get('isEditing')) return YES ;
+    return this._beginEditing(YES);
+  },
+  
+  _beginEditing: function(scrollIfNeeded) {
+    var content  = this.get('content'),
+        del      = this.get('displayDelegate'),
+        labelKey = this.getDelegateProperty('contentValueKey', del),
+        parent   = this.get('parentView'),
+        pf       = parent ? parent.get('frame') : null,
+        el       = this.$label(),
+        f, v, offset, oldLineHeight, fontSize, top, lineHeight, 
+        lineHeightShift, targetLineHeight, ret ;
+
+    // if possible, find a nearby scroll view and scroll into view.
+    // HACK: if we scrolled, then wait for a loop and get the item view again
+    // and begin editing.  Right now collection view will regenerate the item
+    // view too often.
+    if (scrollIfNeeded && this.scrollToVisible()) {
+      var collectionView = this.get('owner'), idx = this.get('contentIndex');
+      this.invokeLater(function() {
+        var item = collectionView.itemViewForContentIndex(idx);
+        if (item && item._beginEditing) item._beginEditing(NO);
+      });
+      return YES; // let the scroll happen then begin editing...
+    }
+    
+    // nothing to do...    
+    if (!parent || !el || el.get('length')===0) return NO ;
+    v = (labelKey && content && content.get) ? content.get(labelKey) : null ;
+
+
+    f = this.computeFrameWithParentFrame(null);
+    offset = SC.viewportOffset(el[0]);
+
+    // if the label has a large line height, try to adjust it to something
+    // more reasonable so that it looks right when we show the popup editor.
+    oldLineHeight = el.css('lineHeight');
+    fontSize = el.css('fontSize');
+    top = this.$().css('top');
+
+    if (top) top = parseInt(top.substring(0,top.length-2),0);
+    else top =0;
+
+    lineHeight = oldLineHeight;
+    lineHeightShift = 0;
+
+    if (fontSize && lineHeight) {
+      targetLineHeight = fontSize * 1.5 ;
+      if (targetLineHeight < lineHeight) {
+        el.css({ lineHeight: '1.5' });
+        lineHeightShift = (lineHeight - targetLineHeight) / 2; 
+      } else oldLineHeight = null ;
+    }
+
+    f.x = offset.x;
+    f.y = offset.y+top + lineHeightShift ;
+    f.height = el[0].offsetHeight ;
+    f.width = el[0].offsetWidth ;
+
+    ret = SC.InlineTextFieldView.beginEditing({
+      frame: f, 
+      exampleElement: el, 
+      delegate: this, 
+      value: v,
+      multiline: NO,
+      isCollection: YES
+    }) ;
+
+    // restore old line height for original item if the old line height 
+    // was saved.
+    if (oldLineHeight) el.css({ lineHeight: oldLineHeight }) ;
+
+    // Done!  If this failed, then set editing back to no.
+    return ret ;
   },
   
   commitEditing: function() {

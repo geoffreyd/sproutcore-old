@@ -108,6 +108,8 @@ SC.PickerPane = SC.PalettePane.extend({
   isModal: YES,
   
   pointerPos: 'perfectRight',
+  pointerPosX: 0,
+  pointerPosY: 0,
   
   /**
     This property will be set to the element (or view.get('layer')) that 
@@ -148,8 +150,9 @@ SC.PickerPane = SC.PalettePane.extend({
     if (preferType) this.set('preferType',preferType) ;
     if (preferMatrix) this.set('preferMatrix',preferMatrix) ;
     this.endPropertyChanges();
-    this.append();
+
     this.positionPane();
+    this.append();
   },
 
   /** @private
@@ -195,7 +198,7 @@ SC.PickerPane = SC.PalettePane.extend({
         origin.y += origin.height ;
       }
       origin = this.fitPositionToScreen(origin, this.get('frame'), anchor) ;
-      layout = { width: layout.width, height: layout.height, left: origin.x, top: origin.y };
+      layout = { width: origin.width, height: origin.height, left: origin.x, top: origin.y };
 
     // if no anchor view has been set for some reason, just center.
     } else {
@@ -211,8 +214,8 @@ SC.PickerPane = SC.PalettePane.extend({
   computeAnchorRect: function(anchor) {
     var ret = SC.viewportOffset(anchor); // get x & y
     var cq = SC.$(anchor);
-    ret.width = cq.width();
-    ret.height = cq.height();
+    ret.width = cq.outerWidth();
+    ret.height = cq.outerHeight();
     return ret ;
   },
 
@@ -298,7 +301,14 @@ SC.PickerPane = SC.PalettePane.extend({
     // min left/right padding to the window
     if( (f.x + f.width) > (w.width-20) ) f.x = w.width - f.width - 20;
     if( f.x < 7 ) f.x = 7;
-    return f ;    
+	
+	// if the height of the menu is bigger than the window height resize it.
+	  if( f.height > w.height){
+		  f.y = 15;
+		  f.height = w.height - 35;
+	  }
+	
+	  return f ;    
   },
 
   /** @private
@@ -312,13 +322,13 @@ SC.PickerPane = SC.PalettePane.extend({
     var overlapTunningX = (a.height > 12) ? 0 : 1;
     var overlapTunningY = (a.height > 12) ? 0 : 3;
 
-    var prefP1    =[[a.x+a.width+(19+overlapTunningX), a.y+parseInt(a.height/2,0)-40], 
+    var prefP1    =[[a.x+a.width+(7+overlapTunningX), a.y+parseInt(a.height/2,0)-40], 
                     [a.x-f.width-(7+overlapTunningX),  a.y+parseInt(a.height/2,0)-40], 
                     [a.x+parseInt(a.width/2,0)-parseInt(f.width/2,0), a.y-f.height-(17+overlapTunningY)],
                     [a.x+parseInt(a.width/2,0)-parseInt(f.width/2,0), a.y+a.height+(17+overlapTunningY)]];
     // bottom-right corner of 4 perfect positioned f  (4x2)
-    var prefP2    =[[a.x+a.width+f.width+(19+overlapTunningX), a.y+parseInt(a.height/2,0)+f.height-40], 
-                    [a.x-(7+overlapTunningX),                  a.y+parseInt(a.height/2,0)+f.height-40], 
+    var prefP2    =[[a.x+a.width+f.width+(7+overlapTunningX), a.y+parseInt(a.height/2,0)+f.height-24], 
+                    [a.x-(7+overlapTunningX),                  a.y+parseInt(a.height/2,0)+f.height-24], 
                     [a.x+parseInt(a.width/2,0)-parseInt(f.width/2,0)+f.width, a.y-(17+overlapTunningY)],
                     [a.x+parseInt(a.width/2,0)-parseInt(f.width/2,0)+f.width, a.y+a.height+f.height+(17+overlapTunningY)]];
     // cutoff of 4 perfect positioned f: top, right, bottom, left  (4x4)
@@ -337,9 +347,19 @@ SC.PickerPane = SC.PalettePane.extend({
 
     // initiated with fallback position
     // Will be used only if the following preferred alternative can not be found
-    f.x = prefP1[m[4]][0] ;
-    f.y = prefP1[m[4]][1] ;
-    this.set('pointerPos', SC.POINTER_LAYOUT[m[4]]);
+    if(m[4] === -1) {
+      //f.x = a.x>0 ? a.x+23 : 0; // another alternative align to left
+      f.x = a.x+parseInt(a.width/2,0);
+      f.y = a.y+parseInt(a.height/2,0)-parseInt(f.height/2,0);
+      this.set('pointerPos', SC.POINTER_LAYOUT[0]+' fallback');
+      this.set('pointerPosY', parseInt(f.height/2,0)-40);      
+    } else {
+      f.x = prefP1[m[4]][0];
+      f.y = prefP1[m[4]][1];
+      this.set('pointerPos', SC.POINTER_LAYOUT[m[4]]);
+      this.set('pointerPosY', 0);      
+    }
+    this.set('pointerPosX', 0);
 
     for(var i=0; i<SC.POINTER_LAYOUT.length; i++) {
       if (cutoffPrefP[m[i]][0]===0 && cutoffPrefP[m[i]][1]===0 && cutoffPrefP[m[i]][2]===0 && cutoffPrefP[m[i]][3]===0) {
@@ -347,25 +367,43 @@ SC.PickerPane = SC.PalettePane.extend({
         if (m[4] != m[i]) {
           f.x = prefP1[m[i]][0] ;
           f.y = prefP1[m[i]][1] ;
+          this.set('pointerPosY', 0);
           this.set('pointerPos', SC.POINTER_LAYOUT[m[i]]);
         }
+        i = SC.POINTER_LAYOUT.length;
+      } else if ((m[i] === 0 || m[i] === 1) && cutoffPrefP[m[i]][0]===0 && cutoffPrefP[m[i]][1]===0 && cutoffPrefP[m[i]][2] < f.height-91 && cutoffPrefP[m[i]][3]===0) {
+        if (m[4] != m[i]) {
+          f.x = prefP1[m[i]][0] ;
+          this.set('pointerPos', SC.POINTER_LAYOUT[m[i]]);
+        }
+        f.y = prefP1[m[i]][1] - cutoffPrefP[m[i]][2];
+        this.set('pointerPosY', cutoffPrefP[m[i]][2]);
+        i = SC.POINTER_LAYOUT.length;
+      } else if ((m[i] === 0 || m[i] === 1) && cutoffPrefP[m[i]][0]===0 && cutoffPrefP[m[i]][1]===0 && cutoffPrefP[m[i]][2] <= f.height-57 && cutoffPrefP[m[i]][3]===0) {
+        if (m[4] != m[i]) {
+          f.x = prefP1[m[i]][0] ;
+        }
+        f.y = prefP1[m[i]][1] - (f.height-57) ;
+        this.set('pointerPosY', (f.height-59));
+        this.set('pointerPos', SC.POINTER_LAYOUT[m[i]]+' extra-low');
         i = SC.POINTER_LAYOUT.length;
       }
     }
     return f ;    
   },
   
-  
+  displayProperties: ["pointerPosY"],
 
   render: function(context, firstTime) {
     var ret = sc_super();
     if (context.needsContent) {
       if (this.get('preferType') == SC.PICKER_POINTER) {
-        context.push('<div class="sc-pointer %@"></div>'.fmt(this.get('pointerPos')));
+        context.push('<div class="sc-pointer %@" style="margin-top: %@px"></div>'.fmt(this.get('pointerPos'), this.get('pointerPosY')));
       }
     } else {
       var el = this.$('.sc-pointer');
       el.attr('class', "sc-pointer %@".fmt(this.get('pointerPos')));
+      el.attr('style', "margin-top: %@px".fmt(this.get('pointerPosY')));
     }
     return ret ;
   },

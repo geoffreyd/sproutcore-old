@@ -121,7 +121,7 @@ SC._object_extend = function _object_extend(base, ext) {
         while(--pathLoc >= 0) {
           local = base._kvo_for(SC.keyFor('_kvo_local', paths[pathLoc]), SC.Set);
           local.add(key);
-          base._kvo_for('_kvo_observed_keys', SC.Set).add(paths[pathLoc]) ;
+          base._kvo_for('_kvo_observed_keys', SC.CoreSet).add(paths[pathLoc]);
         }
 
       // handle computed properties
@@ -145,15 +145,26 @@ SC._object_extend = function _object_extend(base, ext) {
     // copy property
     base[key] = value ;
   }
+  
+  // Manually set base on toString() because some JS engines (such as IE8) do
+  // not enumerate it
+  if (ext.hasOwnProperty('toString')) {
+    key = 'toString';
+    // get the value.  use concats if defined
+    value = (concats.hasOwnProperty(key) ? concats[key] : null) || ext[key] ;
+    if (!value.superclass && (value !== (cur=base[key]))) {
+      value.superclass = value.base = cur || K ;
+    }
+    // copy property
+    base[key] = value ;
+  }
+
 
   // copy bindings, observers, and properties 
   base._bindings = bindings || [];
   base._observers = observers || [] ;
   base._properties = properties || [] ;
   base.outlets = outlets || [];
-
-  // toString is usually skipped.  Don't do that!
-  if (ext.hasOwnProperty('toString')) base.toString = ext.toString;
 
   return base ;
 } ;

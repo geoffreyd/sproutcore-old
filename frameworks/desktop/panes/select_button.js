@@ -8,9 +8,9 @@
 /**
   @class
 
-  Drop Down Menu has a functionality similar to that of SelectField
+  SelectButtonView has a functionality similar to that of SelectField
 
-  Clicking the DropDownMenu button displays a menu pane with a
+  Clicking the SelectButtonView button displays a menu pane with a
   list of items. The selected item will be displayed on the button.
   User has the option of enabling checkbox for the selected menu item.
 
@@ -20,8 +20,8 @@
 */
 sc_require('views/button');
 
-SC.DropDownMenu = SC.ButtonView.extend(
-/** @scope SC.DropDownMenu.prototype */ {
+SC.SelectButtonView = SC.ButtonView.extend(
+/** @scope SC.SelectButtonView.prototype */ {
 
   /**
     An array of items that will be form the menu you want to show.
@@ -99,9 +99,9 @@ SC.DropDownMenu = SC.ButtonView.extend(
   /**
 
     @property
-    @default ['drop-down-menu']
+    @default ['select-button']
   */
-  classNames: ['drop-down-menu'],
+  classNames: ['select-button'],
 
   /**
     Menu item list
@@ -130,7 +130,7 @@ SC.DropDownMenu = SC.ButtonView.extend(
   itemIdx: null,
 
   /**
-     Current Value of the dropDown
+     Current Value of the selectButton
 
      @property
      @default null
@@ -147,7 +147,15 @@ SC.DropDownMenu = SC.ButtonView.extend(
   checkboxEnabled: YES,
 
   /**
-    Default value of the drop down.
+    Set this property to required display positon of separtor from bottom
+
+    @private
+    @default null
+  */
+  separatorPostion: null,
+
+  /**
+    Default value of the select button.
      This will be the first item from the menu item list.
 
     @private
@@ -155,7 +163,7 @@ SC.DropDownMenu = SC.ButtonView.extend(
   _defaultVal: null,
 
   /**
-    Default value of the drop down.
+    Default title of the select button.
      This will be the title corresponding to the _defaultVal.
 
     @private
@@ -163,7 +171,7 @@ SC.DropDownMenu = SC.ButtonView.extend(
   _defaultTitle: null,
 
   /**
-    Default value of the drop down.
+    Default icon of the select button.
      This will be the icon corresponding to the _defaultVal.
 
     @private
@@ -183,17 +191,17 @@ SC.DropDownMenu = SC.ButtonView.extend(
     @property
     @type{SC.Array}
   */
-  displayProperties: ['icon', 'value','controlSize'],
+  displayProperties: ['icon', 'value','controlSize','objects'],
 
   /**
-    Prefer matrix to position the drop down menu such that the
+    Prefer matrix to position the select button menu such that the
     selected item for the menu item will appear aligned to the
     the button. The value at the second index(0) changes based on the
     postion(index) of the menu item in the menu pane.
 
     @property
     @type {Array}
-    @default [ 0, 0, 2]
+    @default null
 
   */
   preferMatrix: null,
@@ -205,9 +213,9 @@ SC.DropDownMenu = SC.ButtonView.extend(
 
     @property
     @type {Number}
-    @default 32
+    @default 28
   */
-  DROP_DOWN_SPRITE_WIDTH: 32,
+  SELECT_BUTTON_SPRITE_WIDTH: 28,
 
   /**
     Property to set the menu item height. This in turn is used for
@@ -237,18 +245,11 @@ SC.DropDownMenu = SC.ButtonView.extend(
 
   /**
     lastMenuWidth is the width of the last menu which was created from
-    the objects of this drop down.
+    the objects of this select button.
 
     @private
   */
   lastMenuWidth: null,
-
-  /**
-    Background color of the icon.This is an optional property.
-
-    @private
-  */
-  iconBgColor: null,
 
   /**
     customView used to draw the menu
@@ -262,6 +263,15 @@ SC.DropDownMenu = SC.ButtonView.extend(
     @default YES
   */
   needsEllipsis: YES,
+  
+  /**
+    This property allows you at add extra padding to the height 
+    of the menu pane.
+    
+    @default 0
+    @property {Number} heightPadding for menu pane.
+  */
+  menuPaneHeightPadding: 0,
 
   /**
     Left Alignment based on the size of the button
@@ -303,20 +313,20 @@ SC.DropDownMenu = SC.ButtonView.extend(
     @private
   */
   render: function(context,firstTime) {
-
+    sc_super();
     var layoutWidth = this.layout.width ;
     if(firstTime && layoutWidth) {
-      this.adjust({ width: layoutWidth - this.DROP_DOWN_SPRITE_WIDTH }) ;
+      this.adjust({ width: layoutWidth - this.SELECT_BUTTON_SPRITE_WIDTH }) ;
     }
 
     var objects = this.get('objects') ;
     objects = this.sortObjects(objects) ;
+    var len = objects.length ;
 
     //Get the namekey, iconKey and valueKey set by the user
     var nameKey = this.get('nameKey') ;
     var iconKey = this.get('iconKey') ;
     var valueKey = this.get('valueKey') ;
-    var iconBgColorKey = this.get('iconBgColorKey') ;
     var checkboxEnabled = this.get('checkboxEnabled') ;
 
     //get the current selected value
@@ -324,6 +334,9 @@ SC.DropDownMenu = SC.ButtonView.extend(
 
     // get the localization flag.
     var shouldLocalize = this.get('localize') ;
+
+    //get the separatorPostion
+    var separatorPostion = this.get('separatorPostion') ;
 
     //itemList array to set the menu items
     var itemList = [] ;
@@ -350,15 +363,11 @@ SC.DropDownMenu = SC.ButtonView.extend(
         object.get(iconKey) : object[iconKey]) : null ;
       if (SC.none(object[iconKey])) icon = null ;
 
-      // get the value using the valueKey or the object 
+      // get the value using the valueKey or the object
       var value = (valueKey) ? (object.get ?
         object.get(valueKey) : object[valueKey]) : object ;
 
-        var iconColor = iconBgColorKey ? (object.get ?
-          object.get(iconBgColorKey) : object[iconBgColorKey]) : null ;
-        if (SC.none(object[iconBgColorKey])) iconBgColor = null ;
-
-      if (currentSelectedVal && value){
+      if (!SC.none(currentSelectedVal) && !SC.none(value)){
         if( currentSelectedVal === value ) {
           this.set('title', name) ;
           this.set('icon', icon) ;
@@ -366,7 +375,7 @@ SC.DropDownMenu = SC.ButtonView.extend(
       }
 
       //Check if the item is currentSelectedItem or not
-      if(name === this.title) {
+      if(value === this.get('value')) {
 
         //set the itemIdx - To change the prefMatrix accordingly.
         this.set('itemIdx', idx) ;
@@ -386,11 +395,10 @@ SC.DropDownMenu = SC.ButtonView.extend(
       var item = SC.Object.create({
         title: name,
         icon: icon,
-        newVal:value,
+        value: value,
         isEnabled: YES,
         checkbox: isChecked,
-        action: this.displaySelectedItem,
-        iconBgColor: iconColor
+        action: this.displaySelectedItem
       }) ;
 
       //Set the items in the itemList array
@@ -398,6 +406,14 @@ SC.DropDownMenu = SC.ButtonView.extend(
     }
 
     idx += 1 ;
+
+    // display the separator if specified by the user
+    if (separatorPostion && idx === (len-separatorPostion)) {
+      var separator = SC.Object.create({
+        separator: YES
+      }) ;
+      itemList.push(separator);
+    }
 
     this.set('itemList', itemList) ;
     }, this ) ;
@@ -412,64 +428,8 @@ SC.DropDownMenu = SC.ButtonView.extend(
     }
 
     //Set the preference matrix for the menu pane
-    this.changeDropDownPreferMatrix(this.itemIdx) ;
+    this.changeSelectButtonPreferMatrix(this.itemIdx) ;
 
-    arguments.callee.base.apply(this,arguments) ;
-  },
-
-  /**
-    renderTitle method
-
-    @private
-  */
-  renderTitle: function(context, firstTime) {
-    var icon = this.get('icon') ;
-    var iconBgColor = this.get('iconBgColor') ;
-    var image = '' ;
-    var title = this.get('displayTitle') ;
-    var needsTitle = (!SC.none(title) && title.length>0) ;
-    var elem, htmlNode ;
-
-    // get the icon.  If there is an icon, then get the image and update it.
-    // if there is no image element yet, create it and insert it just before
-    // title.
-    if (icon) {
-      var blank = sc_static('blank');
-
-      if (iconBgColor) {
-        image = '<img src="%@1" alt="" class="%@2" style="background-color: %@3;" />' ;
-        if (icon.indexOf('/') >= 0) {
-          image = image.fmt(icon, 'icon', iconBgColor) ;
-        }
-        else {
-          image = image.fmt(blank, icon, iconBgColor) ;
-        }
-      }
-      else {
-        image = '<img src="%@1" alt="" class="%@2" />' ;
-        if (icon.indexOf('/') >= 0) {
-          image = image.fmt(icon, 'icon') ;
-        }
-        else {
-          image = image.fmt(blank, icon) ;
-        }
-      }
-      needsTitle = YES ;
-    }
-    elem = this.$('label');
-
-    if (firstTime) {
-      context.push('<label class="sc-button-label">'+image+title+'</label>');
-    }
-    else if ((htmlNode = elem[0])) {
-      if(needsTitle) {
-        htmlNode.innerHTML = image + title ;
-      }
-      else {
-        htmlNode.innerHTML = '' ;
-      }
-    }
-    return context ;
   },
 
   /**
@@ -480,7 +440,6 @@ SC.DropDownMenu = SC.ButtonView.extend(
   */
   _action: function( evt )
   {
-
     var buttonLabel = this.$('.sc-button-label')[0] ;
     var menuWidth = this.get('layer').offsetWidth ; // Get the length of the text on the button in pixels
     var scrollWidth = buttonLabel.scrollWidth ;
@@ -498,6 +457,7 @@ SC.DropDownMenu = SC.ButtonView.extend(
     var currSel = this.get('currentSelItem') ;
     var itemList = this.get('itemList') ;
     var menuControlSize = this.get('controlSize') ;
+    var menuHeightPadding = this.get('menuPaneHeightPadding') ;
 
     // get the user defined custom view
     var customView = this.get('customView') ;
@@ -506,13 +466,12 @@ SC.DropDownMenu = SC.ButtonView.extend(
     var menu  = SC.MenuPane.create({
 
       /**
-        Class name - drop-down-menu-item
-
+        Class name - select-button-item
       */
-      classNames: ['drop-down-menu'],
+      classNames: ['select-button'],
 
       /**
-        The menu items are set from the itemList property of DropDownMenu
+        The menu items are set from the itemList property of SelectButton
 
         @property
       */
@@ -532,6 +491,8 @@ SC.DropDownMenu = SC.ButtonView.extend(
         @property
       */
       isEnabled: YES,
+      
+      menuHeightPadding: menuHeightPadding,
 
       preferType: SC.PICKER_MENU,
       itemHeightKey: 'height',
@@ -550,16 +511,16 @@ SC.DropDownMenu = SC.ButtonView.extend(
   },
 
   /**
-     Action method for the drop down menu items
+     Action method for the select button menu items
 
   */
   displaySelectedItem: function() {
-
     //Get MenuPane, currentSelectedMenuItem & menuItemView
-    var menuView = this.get('parentView') ;
+    // Get the main parent view to show the menus
+    var menuView = this.parentMenu() ;
     var currSel = menuView.get('currentSelectedMenuItem') ;
     var itemViews = menuView.menuItemViews ;
-    var title,newVal ;
+    var title,val ;
 
     //  Fetch the index of the current selected item
     var itemIdx = 0 ;
@@ -567,8 +528,8 @@ SC.DropDownMenu = SC.ButtonView.extend(
       itemIdx = itemViews.indexOf(currSel) ;
     }
 
-    // Get the drop down View
-    var button = this.getPath('parentView.anchor') ;
+    // Get the select button View
+    var button = menuView.get('anchor') ;
 
     // set the value and title
     var object = menuView.get('items') ;
@@ -576,12 +537,12 @@ SC.DropDownMenu = SC.ButtonView.extend(
     var found = null ;
 
     while (!found && (--len >= 0)) {
-      title = object[len].title ? object[len].title: object.toString() ;
-      newVal =  object[len].newVal ? object[len].newVal: title ;
+      title = !SC.none(object[len].title) ? object[len].title: object.toString() ;
+      val =  !SC.none(object[len].value) ? object[len].value: title ;
 
-      if (title === this.get('value')) {
+      if (title === this.get('value') && (itemIdx === len)) {
         found = object ;
-        button.set('value', newVal) ;
+        button.set('value', val) ;
         button.set('title', title) ;
       }
     }
@@ -596,7 +557,7 @@ SC.DropDownMenu = SC.ButtonView.extend(
      position menu such that the selected item in the menu will be
      place aligned to the item on the button when menu is opened.
   */
-  changeDropDownPreferMatrix: function() {
+  changeSelectButtonPreferMatrix: function() {
     var preferMatrixAttributeTop = 0 ;
     var itemIdx = this.get('itemIdx') ;
     var leftAlign = this.get('leftAlign') ;

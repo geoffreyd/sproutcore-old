@@ -65,8 +65,7 @@ SC.RESIZE_BOTTOM_RIGHT = 'resize-bottom-right' ;
   viewhelper.
   
   @property {Boolean} canCollapseViews Set to NO when you don't want any of
-  the child views to collapse. Defaults to YES. Use the :can_collapse_views
-  option with the split_view viewhelper.
+  the child views to collapse. Defaults to YES. 
   
   In addition, the top/left and bottom/right child views can have these
   properties:
@@ -390,24 +389,41 @@ SC.SplitView = SC.View.extend(
   renderLayout: function(context, firstTime) {
     // console.log('%@.renderLayout(%@, %@)'.fmt(this, context, firstTime));
     // console.log('%@.frame = %@'.fmt(this, SC.inspect(this.get('frame'))));
-    // if (firstTime) {
+    // NOTE: This 'if' level used to be commented out.
+    if (firstTime || this._recalculateDivider) {
       if (!this.get('thumbViewCursor')) {
         this.set('thumbViewCursor', SC.Cursor.create()) ;
       }
       
       var layoutDirection = this.get('layoutDirection') ;
-      var splitViewThickness = (layoutDirection == SC.LAYOUT_HORIZONTAL) ? this.get('frame').width : this.get('frame').height ;
+      var fr = this.get('frame');
+      var splitViewThickness, elemRendered = this.$();
+      var dividerThickness = this.get('dividerThickness') || 7 ;
       var desiredThickness = this.get('defaultThickness') ;
       var autoResizeBehavior = this.get('autoresizeBehavior') ;
+      // Turn a flag on to recalculate the spliting if the desired thickness
+      // is a percentage
+      // debugger;
+      if(this._recalculateDivider===undefined && desiredThickness<1) {
+        this._recalculateDivider=YES;
+      }
+      else if(this._recalculateDivider) this._recalculateDivider=NO;
       
+      
+      if(elemRendered[0]) {
+        splitViewThickness = (layoutDirection == SC.LAYOUT_HORIZONTAL) ? 
+              elemRendered[0].offsetWidth : elemRendered[0].offsetHeight ;
+      }else{
+        splitViewThickness = (layoutDirection == SC.LAYOUT_HORIZONTAL) ? 
+              fr.width : fr.height ;
+      }
       // if default thickness is < 1, convert from percentage to absolute
       if (SC.none(desiredThickness) || (desiredThickness > 0 && desiredThickness < 1)) {
-        desiredThickness =  Math.floor(splitViewThickness * (desiredThickness || 0.5)) ;
+        desiredThickness =  Math.floor((splitViewThickness - (dividerThickness))* (desiredThickness || 0.5)) ;
       }
       if (autoResizeBehavior === SC.RESIZE_BOTTOM_RIGHT) {
         this._desiredTopLeftThickness = desiredThickness ;
       } else { // (autoResizeBehavior === SC.RESIZE_TOP_LEFT)
-        var dividerThickness = this.get('dividerThickness') ;
         this._desiredTopLeftThickness =  splitViewThickness - dividerThickness - desiredThickness ;
       }
       
@@ -429,7 +445,7 @@ SC.SplitView = SC.View.extend(
       
       // actually set layout for our child views
       this.updateChildLayout() ;
-    // }
+    }
     sc_super() ;
   },
   
@@ -504,10 +520,14 @@ SC.SplitView = SC.View.extend(
   mouseUp: function(evt) {
     // console.log('%@.mouseUp(%@, %@)'.fmt(this, evt));
     // console.log(evt.originalEvent);
-    this._thumbView = null ; // avoid memory leaks
-    this._inLiveResize = NO ;
-    this.endLiveResize() ;
-    return YES ;
+		if (this._inLiveResize === YES) {
+    	this._thumbView = null ; // avoid memory leaks
+    	this._inLiveResize = NO ;
+    	this.endLiveResize() ;
+    	return YES ;
+		}
+		
+		return NO ;
   },
   
   doubleClickInThumbView: function(evt, thumbView) {
@@ -689,6 +709,11 @@ SC.SplitView = SC.View.extend(
     // console.log('%@.splitViewConstrainThickness(%@, %@, %@)'.fmt(this, splitView, view, proposedThickness));
     return proposedThickness;
   },
+  
+  /* Force to rendering once the pane is attached */
+  _forceSplitCalculation: function(){
+    this.updateLayout(); 
+  }.observes('*pane.isPaneAttached'),
   
   init: function() {
     sc_super() ;

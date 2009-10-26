@@ -112,12 +112,6 @@ SC.Pane = SC.View.extend( /** @scope SC.Pane.prototype */ {
   */
   currentWindowSize: null,
   
-  /** @private 
-  
-    @property {SC.Pane}
-  */
-  previousKeyPane: null,
-  
   /** 
     The parent dimensions are always the last known window size. 
     
@@ -399,12 +393,6 @@ SC.Pane = SC.View.extend( /** @scope SC.Pane.prototype */ {
   didBecomeKeyPaneFrom: function(pane) {
     var isKeyPane = this.get('isKeyPane');
     this.set('isKeyPane', YES);
-    // check if the previousKeyPane is a menu. If it is a menu, don't set as 
-    // a previous keypane, set the previousKeyPane to the keypane before
-    // the menu as it is an the menu is an intermediate pane that you dont want to go back to.
-    if(pane && pane.kindOf(SC.MenuPane)) this.set('previousKeyPane', pane.get('previousKeyPane'));
-    else if(pane) this.set('previousKeyPane', pane);
-    else this.set('previousKeyPane', null);
     this._forwardKeyChange(!isKeyPane, 'didBecomeKeyResponderFrom', pane, YES);
     return this ;
   },
@@ -494,16 +482,14 @@ SC.Pane = SC.View.extend( /** @scope SC.Pane.prototype */ {
     if (dom.parentNode) dom.parentNode.removeChild(dom) ;
     dom = null ;
     
-    // remove from the RootResponder also
-    var responder = this.rootResponder ;
-    if (this.get('isKeyPane')) { // orders matter, remove keyPane first
-      var oldKeyPane = this.get('previousKeyPane');
-      if (!oldKeyPane) responder.makeKeyPane(null) ; 
-      else responder.makeKeyPane(oldKeyPane) ;
-    }
-    if (this.get('isMainPane')) responder.makeMainPane(null) ;
-    responder.panes.remove(this) ;
-    this.rootResponder = responder = null ;
+    // resign keyPane status, if we had it
+    this.resignKeyPane();
+    
+    // remove the pane
+    var rootResponder = this.rootResponder ;
+    if (this.get('isMainPane')) rootResponder.makeMainPane(null) ;
+    rootResponder.panes.remove(this) ;
+    this.rootResponder = null ;
     
     // clean up some of my own properties 
     this.set('isPaneAttached', NO) ;
@@ -524,6 +510,11 @@ SC.Pane = SC.View.extend( /** @scope SC.Pane.prototype */ {
   appendTo: function(elem) {
     var layer = this.get('layer');
     if (!layer) layer =this.createLayer().get('layer'); 
+    
+    if (this.get('isPaneAttached') && (layer.parentNode === elem)) {
+      return this; // nothing to do
+    }
+    
     elem.insertBefore(layer, null); // add to DOM
     elem = layer = null ;
 
@@ -537,8 +528,15 @@ SC.Pane = SC.View.extend( /** @scope SC.Pane.prototype */ {
     @returns {SC.Pane} receiver
   */
   prependTo: function(elem) {
+    if (this.get('isPaneAttached')) return this;
+    
     var layer = this.get('layer');
     if (!layer) layer =this.createLayer().get('layer'); 
+    
+    if (this.get('isPaneAttached') && (layer.parentNode === elem)) {
+      return this; // nothing to do
+    }
+    
     elem.insertBefore(layer, elem.firstChild); // add to DOM
     elem = layer = null ;
 
@@ -553,10 +551,17 @@ SC.Pane = SC.View.extend( /** @scope SC.Pane.prototype */ {
     @returns {SC.Pane} receiver
   */
   before: function(elem) {
+    if (this.get('isPaneAttached')) return this;
+    
     var layer = this.get('layer');
     if (!layer) layer =this.createLayer().get('layer');
     
     var parent = elem.parentNode ; 
+
+    if (this.get('isPaneAttached') && (layer.parentNode === parent)) {
+      return this; // nothing to do
+    }
+    
     parent.insertBefore(layer, elem); // add to DOM
     parent = elem = layer = null ;
 
@@ -571,11 +576,17 @@ SC.Pane = SC.View.extend( /** @scope SC.Pane.prototype */ {
     @returns {SC.Pane} receiver
   */
   after: function(elem) {
+    
     var layer = this.get('layer');
     if (!layer) layer =this.createLayer().get('layer'); 
     
     var parent = elem.parentNode ;
-    elem.insertBefore(layer, elem.nextSibling); // add to DOM
+  
+    if (this.get('isPaneAttached') && (layer.parentNode === parent)) {
+      return this; // nothing to do
+    }
+    
+    parent.insertBefore(layer, elem.nextSibling); // add to DOM
     parent = elem = layer = null ;
 
     return this.paneDidAttach(); // do the rest of the setup

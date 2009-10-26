@@ -338,7 +338,6 @@ SC.RootResponder = SC.RootResponder.extend(
   },
   
   dragDidStart: function(drag) {
-    // console.log('dragDidStart called in %@ with %@'.fmt(this, drag));
     this._mouseDownView = drag ;
     this._drag = drag ;
   },
@@ -394,6 +393,11 @@ SC.RootResponder = SC.RootResponder.extend(
     the keypress event.
   */
   keydown: function(evt) {
+    // This code is to check for the simulated keypressed event
+    if(!evt.kindOf) this._ffevt=null;
+    else evt=this._ffevt;
+    if (evt === null) return YES;
+    
     // Firefox does NOT handle delete here...
     if (SC.browser.mozilla > 0 && (evt.which === 8)) return true ;
     
@@ -401,13 +405,25 @@ SC.RootResponder = SC.RootResponder.extend(
     // send event for modifier key changes, but only stop processing if this 
     // is only a modifier change
     var ret = this._handleModifierChanges(evt);
-    if (this._isModifierKey(evt)) return ret;
+    var target = evt.target || evt.srcElement;
+    var forceBlock = (evt.which === 8) && !SC.allowsBackspaceToPreviousPage && (target === document.body);
+    
+    if (this._isModifierKey(evt)) return (forceBlock ? NO : ret);
     
     // if this is a function or non-printable key, try to use this as a key
     // equivalent.  Otherwise, send as a keyDown event so that the focused
     // responder can do something useful with the event.
+    ret = YES ;
     if (this._isFunctionOrNonPrintableKey(evt)) {
-      
+      // Simulate keydown events for firefox since keypress only triggers once
+      // We don't do it in keypress as it doesn't work in certain cases, ie.
+      // Caret is at last position and you press down arrow key.
+      if (SC.browser.mozilla && evt.keyCode>=37 && evt.keyCode<=40){
+        this._ffevt=evt;
+        SC.RunLoop.begin();
+        this.invokeLater(this.keydown, 50);
+        SC.RunLoop.end();
+      }
       // otherwise, send as keyDown event.  If no one was interested in this
       // keyDown event (probably the case), just let the browser do its own
       // processing.
@@ -415,14 +431,14 @@ SC.RootResponder = SC.RootResponder.extend(
       
       // attempt key equivalent if key not handled
       if (!ret) {
-        ret = this.attemptKeyEquivalent(evt) ;
-        return !ret ;
+        ret = !this.attemptKeyEquivalent(evt) ;
       } else {
-        return evt.hasCustomEventHandling ;
+        ret = evt.hasCustomEventHandling ;
+        if (ret) forceBlock = NO ; // code asked explicitly to let delete go
       }
     }
-    
-    return YES ; // otherwise do not handle keydown - wait for keypress
+
+    return forceBlock ? NO : ret ; 
   },
   
   /** @private
@@ -434,9 +450,12 @@ SC.RootResponder = SC.RootResponder.extend(
     trigger a keyDown.
   */
   keypress: function(evt) {
+    var ret ;
+    
     // delete is handled in keydown() for most browsers
     if (SC.browser.mozilla > 0 && (evt.which === 8)) {
-      return this.sendEvent('keyDown', evt) ? evt.hasCustomEventHandling:YES;
+      ret = this.sendEvent('keyDown', evt);
+      return ret ? (SC.allowsBackspaceToPreviousPage || evt.hasCustomEventHandling) : YES ;
 
     // normal processing.  send keyDown for printable keys...
     } else {
@@ -446,6 +465,8 @@ SC.RootResponder = SC.RootResponder.extend(
   },
   
   keyup: function(evt) {
+    // to end the simulation of keypress in firefox set the _ffevt to null
+    if(this._ffevt) this._ffevt=null;
     // modifier keys are handled separately by the 'flagsChanged' event
     // send event for modifier key changes, but only stop processing if this is only a modifier change
     var ret = this._handleModifierChanges(evt);
@@ -458,7 +479,10 @@ SC.RootResponder = SC.RootResponder.extend(
       // make sure the window gets focus no matter what.  FF is inconsistant 
       // about this.
       this.focus();
-      
+      if(SC.browser.msie) {
+        this._lastMouseDownX = evt.clientX;
+        this._lastMouseDownY = evt.clientY;
+      }
       // first, save the click count.  Click count resets if your down is
       // more than 125msec after you last click up.
       this._clickCount += 1 ;
@@ -468,11 +492,22 @@ SC.RootResponder = SC.RootResponder.extend(
       evt.clickCount = this._clickCount ;
       
       var view = this.targetViewForEvent(evt) ;
+      // InlineTextField needs to loose firstResponder whenever you click outside
+      // the view. This is a special case as textfields are not supposed to loose 
+      // focus unless you click on a list, another textfield or an special
+      // view/control.
+      var fr=null;
+      if(view) fr=view.get('pane').get('firstResponder');
+      
+      if(fr && fr.kindOf(SC.InlineTextFieldView) && fr!==view){
+        fr.resignFirstResponder();
+      }
+      
       view = this._mouseDownView = this.sendEvent('mouseDown', evt, view) ;
       if (view && view.respondsTo('mouseDragged')) this._mouseCanDrag = YES ;
     } catch (e) {
     
-      console.log('Exception during mousedown: %@'.fmt(e)) ;
+      console.warn('Exception during mousedown: %@'.fmt(e)) ;
       this._mouseDownView = null ;
       this._mouseCanDrag = NO ;
       throw e;
@@ -489,7 +524,7 @@ SC.RootResponder = SC.RootResponder.extend(
     sent.
   */
   mouseup: function(evt) {
-    // console.log('mouseup called in %@ with this._mouseDownView = %@'.fmt(this, this._mouseDownView));
+
     try {
       if (this._drag) {
         this._drag.tryToPerform('mouseUp', evt) ;
@@ -536,7 +571,6 @@ SC.RootResponder = SC.RootResponder.extend(
       // cleanup
       this._mouseCanDrag = NO; this._mouseDownView = null ;
     } catch (e) {
-      console.log('Exception during mouseup: %@'.fmt(e)) ;
       this._drag = null; this._mouseCanDrag = NO; this._mouseDownView = null ;
       throw e;
     }
@@ -556,7 +590,6 @@ SC.RootResponder = SC.RootResponder.extend(
       var view = this.targetViewForEvent(evt) ;
       var handler = this.sendEvent('mouseWheel', evt, view) ;
     } catch (e) {
-      console.log('Exception during mousewheel: %@'.fmt(e)) ;
       throw e;
     }
     return (handler) ? evt.hasCustomEventHandling : YES ;
@@ -565,10 +598,10 @@ SC.RootResponder = SC.RootResponder.extend(
   _lastHovered: null,
   
   /**
-   This will send mouseOver, mouseOut, and mouseMoved to the views you
-   hover over.  To receive these events, you must implement the method.
-   If any subviews implement them and return true, then you won't receive
-   any notices.
+   This will send mouseEntered, mouseExited, mousedDragged and mouseMoved 
+   to the views you hover over.  To receive these events, you must implement 
+   the method. If any subviews implement them and return true, then you won't 
+   receive any notices.
    
    If there is a target mouseDown view, then mouse moved events will also
    trigger calls to mouseDragged.
@@ -584,7 +617,15 @@ SC.RootResponder = SC.RootResponder.extend(
       // only do mouse[Moved|Entered|Exited|Dragged] if not in a drag session
       // drags send their own events, e.g. drag[Moved|Entered|Exited]
       if (this._drag) {
-        this._drag.tryToPerform('mouseDragged', evt);
+        //IE triggers mousemove at the same time as mousedown
+        if(SC.browser.msie){
+          if (this._lastMouseDownX !== evt.clientX && this._lastMouseDownY !== evt.clientY) {
+            this._drag.tryToPerform('mouseDragged', evt);
+          }
+        }
+        else {
+          this._drag.tryToPerform('mouseDragged', evt);
+        }
       } else {
         
         var lh = this._lastHovered || [] ;
@@ -619,12 +660,17 @@ SC.RootResponder = SC.RootResponder.extend(
         // also, if a mouseDownView exists, call the mouseDragged action, if 
         // it exists.
         if (this._mouseDownView) {
-          this._mouseDownView.tryToPerform('mouseDragged', evt);
+          if(SC.browser.msie){
+            if (this._lastMouseDownX !== evt.clientX && this._lastMouseDownY !== evt.clientY) {
+              this._mouseDownView.tryToPerform('mouseDragged', evt);
+            }
+          }
+          else {
+            this._mouseDownView.tryToPerform('mouseDragged', evt);
+          }
         }
-        
       }
     } catch (e) {
-      console.log('Exception during mousemove: %@'.fmt(e)) ;
       throw e;
     }
     SC.RunLoop.end();
@@ -639,7 +685,7 @@ SC.RootResponder = SC.RootResponder.extend(
   
   selectstart: function(evt) { 
     var result = this.sendEvent('selectStart', evt, this.targetViewForEvent(evt));
-    return (result !=null ? YES: NO) && (this._mouseCanDrag ? NO : YES);
+    return (result !==null ? YES: NO) && (this._mouseCanDrag ? NO : YES);
   },
   
   drag: function() { return false; }

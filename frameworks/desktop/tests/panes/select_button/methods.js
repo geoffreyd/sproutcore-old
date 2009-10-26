@@ -7,9 +7,9 @@
 
 /*global module test htmlbody ok equals same stop start */
 
-var pane, view , view1, view2, view3 ;
+var pane, view , view1, view2, view3, view4 ;
 
-module("SC.DropDownMenu",{
+module("SC.SelectButtonView",{
 
   //setup
   setup: function() {
@@ -19,31 +19,35 @@ module("SC.DropDownMenu",{
     //pane
     pane = SC.MainPane.create({
       objs : ["Around","The","World"],
+      objs2 : [{ title: "Around", pos: 3},
+        { title: "The", pos: 1},
+        { title: "World", pos: 2 },
+        { title: "Again", pos: 4}],
       selectedValue: "World",
       isDue: YES,
       childViews: [
 
         //view1
-        SC.DropDownMenu.extend({
+        SC.SelectButtonView.extend({
           objects: ["To","Back", "You"],
           disableSort: NO
         }),
 
         //view2
-        SC.DropDownMenu.extend({
+        SC.SelectButtonView.extend({
           objects: ["Drop","Down", "Menu"]
         }),
 
         //view3
-        SC.DropDownMenu.extend({
+        SC.SelectButtonView.extend({
           objectsBinding: '*owner.objs',
           valueBinding: '*owner.selectedValue',
           isVisibleBinding: '*owner.isDue'
         }),
 
         //view4
-        SC.DropDownMenu.extend({
-          objectsBinding: '*owner.objs',
+        SC.SelectButtonView.extend({
+          objectsBinding: '*owner.objs2',
           valueBinding: '*owner.selectedValue',
           valueKey: 'title',
           nameKey: 'title',
@@ -91,10 +95,10 @@ test("Check if isVisibleBinding works", function() {
 });
 
 //test4
-test("DropDownMenu with objects", function() {
-  equals(3,view1.objects.length,'The number of options in dropDown Menu should be') ;
-  equals(null,view1.nameKey,'the dropDownMenu should not have any name key') ;
-  equals(null,view1.valueKey,'the dropDownMenu should not have any value key') ;
+test("SelectButton with objects", function() {
+  equals(3,view1.objects.length,'The number of options in selectButton Menu should be') ;
+  equals(null,view1.nameKey,'the selectButton should not have any name key') ;
+  equals(null,view1.valueKey,'the selectButton should not have any value key') ;
 });
 
 //test5

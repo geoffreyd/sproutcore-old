@@ -38,16 +38,45 @@ SC.mixin(/** @scope SC */ {
     Execute callback function.
   */
   _scb_bundleDidLoad: function(bundleName, target, method, args) {
+    var m, t;
     if(SC.typeOf(target) === SC.T_STRING) {
-      target = SC.objectForPropertyPath(target);
+      t = SC.objectForPropertyPath(target);
     }
 
     if(SC.typeOf(method) === SC.T_STRING) {
-      method = SC.objectForPropertyPath(method, target);
+      m = SC.objectForPropertyPath(method, t);
     }
     
-    if(!method) {
-      throw "SC.loadBundle(): could not find callback for '%@'".fmt(bundleName);
+    if(!m) {
+
+      if(SC.LAZY_INSTANTIATION[bundleName]) {
+        var lazyInfo = SC.LAZY_INSTANTIATION[bundleName];
+
+      if(SC.logBundleLoading) console.log("SC.loadBundle(): Bundle '%@' is marked for lazy instantiation, instantiating it now…".fmt(bundleName));            
+        
+        for(var i=0, iLen = lazyInfo.length; i<iLen; i++) {
+          try { 
+            lazyInfo[i]();
+          }catch(e) {
+            console.log("SC.loadBundle(): Failted to lazily instatiate entry for  '%@'".fmt(bundleName));  
+          }
+        }
+        delete SC.LAZY_INSTANTIATION[bundleName];
+
+        if(SC.typeOf(target) === SC.T_STRING) {
+          t = SC.objectForPropertyPath(target);
+        }
+        if(SC.typeOf(method) === SC.T_STRING) {
+          m = SC.objectForPropertyPath(method, t);
+        }
+
+        if(!method) {
+          throw "SC.loadBundle(): could not find callback for lazily instantiated bundle '%@'".fmt(bundleName);
+
+        }
+      } else {
+        throw "SC.loadBundle(): could not find callback for '%@'".fmt(bundleName);
+      }
     }
 
     if(!args) {
@@ -58,10 +87,31 @@ SC.mixin(/** @scope SC */ {
     
     var needsRunLoop = !!SC.RunLoop.currentRunLoop;
     if (needsRunLoop) SC.RunLoop.begin() ;
-    method.apply(target, args) ;
+    m.apply(t, args) ;
     if (needsRunLoop) SC.RunLoop.end() 
   },
   
+  tryToLoadBundle: function(bundleName, target, method, args) {
+    var m, t;
+    
+    // First see if it is already defined.
+    if(SC.typeOf(target) === SC.T_STRING) {
+      t = SC.objectForPropertyPath(target);
+    }
+    if(SC.typeOf(method) === SC.T_STRING) {
+      m = SC.objectForPropertyPath(method, t);
+    }
+
+    // If the method exists, try to call it. It could have been loaded 
+    // through other means but the SC.BUNDLE_INFO entry doesn't exist.
+    if(m || SC.LAZY_INSTANTIATION[bundleName]) {
+      if(SC.logBundleLoading) console.log("SC.loadBundle(): Bundle '%@' found through other means, will attempt to load…".fmt(bundleName));
+      SC.BUNDLE_INFO[bundleName] = {loaded: YES};
+      return SC.BUNDLE_INFO[bundleName]; 
+    }
+    return NO;
+  },
+    
   /**
     Dynamically load bundleName if not already loaded. Call the target and 
     method with any given arguments.
@@ -71,7 +121,7 @@ SC.mixin(/** @scope SC */ {
     @param method {Function}
   */
   loadBundle: function(bundleName, target, method) {
-    
+    var idx, len;
     if(method === undefined && SC.typeOf(target) === SC.T_FUNCTION) {
       method = target;
       target = null;
@@ -80,9 +130,17 @@ SC.mixin(/** @scope SC */ {
     var bundleInfo = SC.BUNDLE_INFO[bundleName], callbacks, targets ;
     var args = SC.A(arguments).slice(3);
 
-    if(SC.logBundleLoading) console.log("SC.loadBundle(): Attempting to load '%@'".fmt(bundleName));
+    if(SC.logBundleLoading) {
+      console.log("SC.loadBundle(): Attempting to load '%@'".fmt(bundleName));
+    }
+    
+    if(!bundleInfo) {
+      if(SC.logBundleLoading) console.log("SC.loadBundle(): Attemping to load %@ without SC.BUNDLE_INFO entry… could be loaded through other means.".fmt(bundleName));
+      bundleInfo = this.tryToLoadBundle(bundleName, target, method, args);
+    }
+    
 
-    if (!bundleInfo) {
+    if (!bundleInfo) {        
       throw "SC.loadBundle(): could not find bundle '%@'".fmt(bundleName) ;
     } else if (bundleInfo.loaded) {
 
@@ -117,7 +175,7 @@ SC.mixin(/** @scope SC */ {
         // load bundle's dependencies first
         var requires = bundleInfo.requires || [] ;
         var dependenciesMet = YES ;
-        for (var idx=0, len=requires.length; idx<len; ++idx) {
+        for (idx=0, len=requires.length; idx<len; ++idx) {
           var targetName = requires[idx] ;
           var targetInfo = SC.BUNDLE_INFO[targetName] ;
           if (!targetInfo) {
@@ -150,7 +208,7 @@ SC.mixin(/** @scope SC */ {
         
         if (dependenciesMet) {
           // add <script> and <link> tags to DOM for bundle's resources
-          var styles, scripts, url, el, head, body, idx, len ;
+          var styles, scripts, url, el, head, body;
           head = document.getElementsByTagName('head')[0] ;
           if (!head) head = document.documentElement ; // fix for Opera
           styles = bundleInfo.styles || [] ;
@@ -168,8 +226,9 @@ SC.mixin(/** @scope SC */ {
           // Push the URLs on the the queue and then start the loading.
           var jsBundleLoadQueue = this._jsBundleLoadQueue;
           if(!jsBundleLoadQueue) this._jsBundleLoadQueue = jsBundleLoadQueue = {};
-          var q = jsBundleLoadQueue[bundleName] = [], 
-              scripts = bundleInfo.scripts || [] ;
+          jsBundleLoadQueue[bundleName] = [];
+          var q = jsBundleLoadQueue[bundleName] ;
+          scripts = bundleInfo.scripts || [] ;
           
           for (idx=0, len=scripts.length; idx<len; ++idx) {
             url = scripts[idx] ;
@@ -221,8 +280,11 @@ SC.mixin(/** @scope SC */ {
   */
   bundleDidLoad: function(bundleName) {
     var bundleInfo = SC.BUNDLE_INFO[bundleName], callbacks, targets ;
-    if (!bundleInfo) bundleInfo = SC.BUNDLE_INFO[bundleName] = {} ;
-    if (bundleInfo.loaded) {
+    if (!bundleInfo) {
+      bundleInfo = SC.BUNDLE_INFO[bundleName] = { loaded: YES} ;
+      return;
+    }
+    if (bundleInfo.loaded && SC.logBundleLoading) {
       console.log("SC.bundleDidLoad() called more than once for bundle '%@'. Skipping.".fmt(bundleName));
       return ;
     }
@@ -237,7 +299,7 @@ SC.mixin(/** @scope SC */ {
     } else {
       SC.ready(SC, function() {
         SC._invokeCallbacksForBundle(bundleName) ;
-      })
+      });
     }
     
     // for each dependent bundle, try and load them again...

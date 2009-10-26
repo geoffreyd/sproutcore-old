@@ -7,8 +7,10 @@
 
 sc_require('models/record');
 
-/** @class
-  
+/**
+  @class
+
+
   The Store is where you can find all of your dataHashes. Stores can be 
   chained for editing purposes and committed back one chain level at a time 
   all the way back to a persistent data source.
@@ -20,12 +22,20 @@ sc_require('models/record');
   Internally, the store will keep track of changes to your json data hashes
   and manage syncing those changes with your data source.  A data source may
   be a server, local storage, or any other persistent code.
-  
+
   @extends SC.Object
   @since SproutCore 1.0
 */
 SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
   
+  /**
+    An (optional) name of the store, which can be useful during debugging,
+    especially if you have multiple nested stores.
+    
+    @property {String}
+  */
+  name: null,
+
   /**
     An array of all the chained stores that current rely on the receiver 
     store.
@@ -121,13 +131,23 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     }}}
     
     @param {Hash} attrs optional attributes to set on new store
+    @param {Class} newStoreClass optional the class of the newly-created nested store (defaults to SC.NestedStore)
     @returns {SC.NestedStore} new nested store chained to receiver
   */
-  chain: function(attrs) {
+  chain: function(attrs, newStoreClass) {
     if (!attrs) attrs = {};
     attrs.parentStore = this;
     
-    var ret    = SC.NestedStore.create(attrs),
+    if (newStoreClass) {
+      // Ensure the passed-in class is a type of nested store.
+      if (SC.typeOf(newStoreClass) !== 'class') throw new Error("%@ is not a valid class".fmt(newStoreClass));
+      if (!SC.kindOf(newStoreClass, SC.NestedStore)) throw new Error("%@ is not a type of SC.NestedStore".fmt(newStoreClass));
+    }
+    else {
+      newStoreClass = SC.NestedStore;
+    }
+    
+    var ret    = newStoreClass.create(attrs),
         nested = this.nestedStores;
         
     if (!nested) nested = this.nestedStores = [];
@@ -231,6 +251,28 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @property {Array}
   */
   recordArraysWithQuery: null,
+  
+  /**
+    An array of SC.Error objects associated with individual records in the
+    store (indexed by store keys).
+    
+    Errors passed form the data source in the call to dataSourceDidError() are
+    stored here.
+    
+    @property {Array}
+  */
+  recordErrors: null,
+  
+  /**
+    A hash of SC.Error objects associated with queries (indexed by the GUID
+    of the query).
+    
+    Errors passed from the data source in the call to dataSourceDidErrorQuery()
+    are stored here.
+    
+    @property {Hash}
+  */
+  queryErrors: null,
   
   // ..........................................................
   // CORE ATTRIBUTE API
@@ -480,7 +522,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
       // when store needs to propagate out changes in the parent store
       // to nested stores
       if (editState === K.INHERITED) {
-        store._notifyRecordPropertyChange(storeKey, statusOnly);
+        store._notifyRecordPropertyChange(storeKey, statusOnly, key);
 
       } else if (status & SC.Record.BUSY) {
         // make sure nested store does not have any changes before resetting
@@ -493,9 +535,9 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     var changes = this.recordPropertyChanges;
     if (!changes) {
       changes = this.recordPropertyChanges = 
-        { storeKeys:  SC.CoreSet.create(), 
-          records:    SC.CoreSet.create(), 
-          statusOnly: SC.CoreSet.create(),
+        { storeKeys:      SC.CoreSet.create(),
+          records:        SC.CoreSet.create(),
+          hasDataChanges: SC.CoreSet.create(),
           propertyForStoreKeys: {} };
     }
     
@@ -503,15 +545,32 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
 
     if (records && (rec=records[storeKey])) {
       changes.records.push(storeKey);
-      if(statusOnly) changes.statusOnly.push(storeKey);
       
-      // if this is a key specific change, make sure that only those
-      // properties/keys are notified
+      // If there are changes other than just the status we need to record
+      // that information so we do the right thing during the next flush.
+      // Note that if we're called multiple times before flush and one call
+      // has statusOnly=true and another has statusOnly=false, the flush will
+      // (correctly) operate in statusOnly=false mode.
+      if (!statusOnly) changes.hasDataChanges.push(storeKey);
+      
+      // If this is a key specific change, make sure that only those
+      // properties/keys are notified.  However, if a previous invocation of
+      // _notifyRecordPropertyChange specified that all keys have changed, we
+      // need to respect that.
       if (key) {
         if (!(keys = changes.propertyForStoreKeys[storeKey])) {
           keys = changes.propertyForStoreKeys[storeKey] = SC.CoreSet.create();
         }
-        keys.add(key);
+        
+        // If it's '*' instead of a set, then that means there was a previous
+        // invocation that said all keys have changed.
+        if (keys !== '*') {
+          keys.add(key);
+        }
+      }
+      else {
+        // Mark that all properties have changed.
+        changes.propertyForStoreKeys[storeKey] = '*';
       }
     }
     
@@ -530,25 +589,28 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
   flush: function() {
     if (!this.recordPropertyChanges) return this;
     
-    var changes     = this.recordPropertyChanges,
-        storeKeys   = changes.storeKeys, 
-        statusOnly  = changes.statusOnly,
-        records     = changes.records, 
-        propertyForStoreKeys  = changes.propertyForStoreKeys,
+    var changes              = this.recordPropertyChanges,
+        storeKeys            = changes.storeKeys,
+        hasDataChanges       = changes.hasDataChanges,
+        records              = changes.records,
+        propertyForStoreKeys = changes.propertyForStoreKeys,
         recordTypes = SC.CoreSet.create(),
-        rec, recordType, status, idx, len, storeKey, keys;
+        rec, recordType, statusOnly, idx, len, storeKey, keys;
     
     storeKeys.forEach(function(storeKey) {
-
       if (records.contains(storeKey)) {
-        status = statusOnly.contains(storeKey) ? YES: NO;
+        statusOnly = hasDataChanges.contains(storeKey) ? NO : YES;
         rec = this.records[storeKey];
         keys = propertyForStoreKeys ? propertyForStoreKeys[storeKey] : null;
+        
+        // Are we invalidating all keys?  If so, don't pass any to
+        // storeDidChangeProperties.
+        if (keys === '*') keys = null;
         
         // remove it so we don't trigger this twice
         records.remove(storeKey);
         
-        if (rec) rec.storeDidChangeProperties(status, keys);
+        if (rec) rec.storeDidChangeProperties(statusOnly, keys);
       }
       
       recordType = SC.Store.recordTypeFor(storeKey);
@@ -559,9 +621,10 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     this._notifyRecordArrays(storeKeys, recordTypes);
 
     storeKeys.clear();
-    statusOnly.clear();
+    hasDataChanges.clear();
     records.clear();
-    propertyForStoreKeys.length = 0; // reset
+    // Provide full reference to overwrite
+    this.recordPropertyChanges.propertyForStoreKeys = {};
     
     return this;
   },
@@ -580,9 +643,11 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     this.revisions  = {} ;
     this.statuses   = {} ;
     
-    // also reset temporary objects
+    // also reset temporary objects and errors
     this.chainedChanges = this.locks = this.editables = null;
     this.changelog = null ;
+    this.recordErrors = null;
+    this.queryErrors = null;
     
     var records = this.records, storeKey;
     if (records) {
@@ -756,14 +821,15 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {SC.Record} record instance or null
   */
   find: function(recordType, id) {
+    
     // if recordType is passed as string, find object
     if (SC.typeOf(recordType)===SC.T_STRING) {
       recordType = SC.objectForPropertyPath(recordType);
     }
     
     // handle passing a query...
-    if ((arguments.length === 1) && !(recordType && recordType.isRecord)) {
-      if (!recordType) throw "SC.Store#find() must pass recordType or query";
+    if ((arguments.length === 1) && !(recordType && recordType.get && recordType.get('isRecord'))) {
+      if (!recordType) throw new Error("SC.Store#find() must pass recordType or query");
       if (!recordType.isQuery) {
         recordType = SC.Query.local(recordType);
       }
@@ -880,7 +946,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {SC.Store} receiver
   */
   refreshQuery: function(query) {
-    if (!query) throw "refreshQuery() requires a query";
+    if (!query) throw new Error("refreshQuery() requires a query");
 
     var cache    = this._scst_recordArraysByQuery,
         recArray = cache ? cache[SC.guidFor(query)] : null, 
@@ -1674,6 +1740,30 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     // return storeKeys
     return ret ;
   },
+
+  /**
+    Returns the SC.Error object associated with a specific record.
+
+    @param {Number} storeKey The store key of the record.
+ 
+    @returns {SC.Error} SC.Error or undefined if no error associated with the record.
+  */
+  readError: function(storeKey) {
+    var errors = this.recordErrors ;
+    return errors ? errors[storeKey] : undefined ;
+  },
+
+  /**
+    Returns the SC.Error object associated with a specific query.
+
+    @param {SC.Query} query The SC.Query with which the error is associated.
+ 
+    @returns {SC.Error} SC.Error or undefined if no error associated with the query.
+  */
+  readQueryError: function(query) {
+    var errors = this.queryErrors ;
+    return errors ? errors[SC.guidFor(query)] : undefined ;
+  },
   
   // ..........................................................
   // DATA SOURCE CALLBACKS
@@ -1795,11 +1885,12 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
   /**
     Converts the passed record into an error object.
     
-    @param {Number} storeKey record store key to cancel
+    @param {Number} storeKey record store key to error
+    @param {SC.Error} error [optional] an SC.Error instance to associate with storeKey
     @returns {SC.Store} reciever
   */
   dataSourceDidError: function(storeKey, error) {
-    var status = this.readStatus(storeKey), K = SC.Record;
+    var status = this.readStatus(storeKey), errors = this.recordErrors, K = SC.Record;
     
     // EMPTY, ERROR, READY_CLEAN, READY_NEW, READY_DIRTY, DESTROYED_CLEAN,
     // DESTROYED_DIRTY
@@ -1807,6 +1898,12 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
 
     // otherwise, determine proper state transition
     else status = K.ERROR ;
+
+    // Add the error to the array of record errors (for lookup later on if necessary).
+    if (error && error.isError) {
+      if (!errors) errors = this.recordErrors = [];
+      errors[storeKey] = error;
+    }
 
     this.writeStatus(storeKey, status) ;
     this.dataHashDidChange(storeKey, null, YES);
@@ -1879,17 +1976,25 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     
     @param {Class} recordType the SC.Record subclass
     @param {Object} id the record id or null
-    @param {Number} storeKey optional store key.  
+    @param {SC.Error} error [optional] an SC.Error instance to associate with id or storeKey
+    @param {Number} storeKey optional store key.
     @returns {Boolean} YES if push was allowed
   */
   pushError: function(recordType, id, error, storeKey) {
-    var K = SC.Record, status;
+    var K = SC.Record, status, errors = this.recordErrors;
     
     if(storeKey===undefined) storeKey = recordType.storeKeyFor(id);
     status = this.readStatus(storeKey);
     
     if(status==K.EMPTY || status==K.ERROR || status==K.READY_CLEAN || status==K.DESTROY_CLEAN){
       status = K.ERROR;
+      
+      // Add the error to the array of record errors (for lookup later on if necessary).
+      if (error && error.isError) {
+        if (!errors) errors = this.recordErrors = [];
+        errors[storeKey] = error;
+      }
+      
       this.writeStatus(storeKey, status) ;
       this.dataHashDidChange(storeKey, null, YES);
       return YES;
@@ -1926,7 +2031,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
   */
   loadQueryResults: function(query, storeKeys) {
     if (query.get('location') === SC.Query.LOCAL) {
-      throw "Cannot load query results for a local query";
+      throw new Error("Cannot load query results for a local query");
     }
 
     var recArray = this._findQuery(query, YES, NO);
@@ -2002,10 +2107,18 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     again.
     
     @param {SC.Query} query the query with the error
-    @param {SC.Error} error optional error object to set
+    @param {SC.Error} error [optional] an SC.Error instance to associate with query
     @returns {SC.Store} receiver
   */
   dataSourceDidErrorQuery: function(query, error) {
+    var errors = this.queryErrors;
+
+    // Add the error to the array of query errors (for lookup later on if necessary).
+    if (error && error.isError) {
+      if (!errors) errors = this.queryErrors = {};
+      errors[SC.guidFor(query)] = error;
+    }
+
     return this._scstore_dataSourceDidErrorQuery(query, YES);
   },
 
@@ -2035,6 +2148,20 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     this.reset();
   },
   
+  
+  toString: function() {
+    // Include the name if the client has specified one.
+    var name = this.get('name');
+    if (!name) {
+      return sc_super();
+    }
+    else {
+      var ret = sc_super();
+      return "%@ (%@)".fmt(name, ret);
+    }
+  },
+
+
   // ..........................................................
   // PRIMARY KEY CONVENIENCE METHODS
   // 
@@ -2174,6 +2301,14 @@ SC.Store.mixin({
   NESTED_STORE_UNSUPPORTED_ERROR: new Error("Unsupported In Nested Store"),
   
   /**
+    Standard error if you try to retrieve a record in a nested store that is
+    dirty.  (This is allowed on the main store, but not in nested stores.)
+    
+    @property {Error}
+  */
+  NESTED_STORE_RETRIEVE_DIRTY_ERROR: new Error("Cannot Retrieve Dirty Record in Nested Store"),
+
+  /**
     Data hash state indicates the data hash is currently editable
     
     @property {String}
@@ -2285,7 +2420,7 @@ SC.Store.mixin({
 
       recordType = this.recordTypeFor(storeKey);
        if (!recordType) {
-        throw "replaceIdFor: storeKey %@ does not exist".fmt(storeKey);
+        throw new Error("replaceIdFor: storeKey %@ does not exist".fmt(storeKey));
       }
 
       // map one direction...

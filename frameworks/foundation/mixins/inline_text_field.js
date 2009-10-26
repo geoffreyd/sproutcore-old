@@ -83,6 +83,11 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
 /** @scope SC.InlineTextFieldView.prototype */ {
 
   /**
+    Over-write magic number from SC.TextFieldView
+  */
+  _topOffsetForFirefoxCursorFix: 0,
+
+  /**
     Invoked by the class method to begin editing on an inline editor.
     
     You generally should call the class method beginEditing() instead of
@@ -93,7 +98,10 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
     @returns {Boolean} YES if editor began editing, NO if it failed.
   */
   beginEditing: function(options) {
-    var layout={}, pane;
+    if (!options) return;
+    
+    var layout={}, pane, delLayout, paneElem;
+    
     // end existing editing if necessary
     this.beginPropertyChanges();
     if (this.get('isEditing') && !this.blurEditor()) {
@@ -111,6 +119,11 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
     
     this._originalValue = options.value || '' ;
     this._multiline = (options.multiline !== undefined) ? options.multiline : NO ;
+    if(this._multiline){
+      this.set('isTextArea', YES);
+    }else{
+    this.set('isTextArea', NO);
+    }
     this._commitOnBlur =  (options.commitOnBlur !== undefined) ? options.commitOnBlur : YES ;
 
     // set field values
@@ -126,15 +139,17 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
 
     layout.height = this._optframe.height;
     layout.width=this._optframe.width;
-    if(this._optIsCollection && this._delegate.get('layout').left){
-      layout.left=this._optframe.x-this._delegate.get('layout').left-pane.$()[0].offsetLeft-1;
+    delLayout = this._delegate.get('layout');
+    paneElem = pane.$()[0];
+    if(this._optIsCollection && delLayout.left){
+      layout.left=this._optframe.x-delLayout.left-paneElem.offsetLeft-1;
     }else{
-      layout.left=this._optframe.x-pane.$()[0].offsetLeft-1;
+      layout.left=this._optframe.x-paneElem.offsetLeft-1;
     }
-    if(this._optIsCollection && this._delegate.get('layout').top){
-      layout.top=this._optframe.y-this._delegate.get('layout').top-pane.$()[0].offsetTop;
+    if(this._optIsCollection && delLayout.top){
+      layout.top=this._optframe.y-delLayout.top-paneElem.offsetTop;
     }else{
-      layout.top=this._optframe.y-pane.$()[0].offsetTop;  
+      layout.top=this._optframe.y-paneElem.offsetTop;  
     }
 
     this.set('layout', layout);
@@ -145,7 +160,6 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
     pane.appendChild(this);
     
     SC.RunLoop.begin().end();
-    
     
     var del = this._delegate ;
 
@@ -158,15 +172,17 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
     // this.resizeToFit(this.getFieldValue()) ;
 
     // allow notifications to go
-    this.endPropertyChanges() ;
+    
     
     // and become first responder
-    this.becomeFirstResponder() ;
-  
-    if(SC.browser.msie) this.invokeLater(this._selectRootElement, 200) ;
-    else this._selectRootElement();
-  
+    this._previousFirstResponder = pane ? pane.get('firstResponder') : null;
+   
+    this.endPropertyChanges() ;
+
     this.invokeDelegateMethod(del, 'inlineEditorDidBeginEditing', this) ;
+    //if(SC.browser.mozilla)this.invokeOnce(this.becomeFirstResponder) ;
+    this.invokeLast(this.becomeFirstResponder) ;
+
   },
   
   
@@ -230,7 +246,14 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
 
     // resign first responder if not done already.  This may call us in a 
     // loop but since isEditing is already NO, nothing will happen.
-    if (this.get('isFirstResponder')) this.resignFirstResponder();
+    if (this.get('isFirstResponder')) {
+      var pane = this.get('pane');
+      if (pane && this._previousFirstResponder) {
+        pane.makeFirstResponder(this._previousFirstResponder);
+      } else this.resignFirstResponder();
+    }
+    this._previousFirstResponder = null ; // clearout no matter what
+    
     if (this.get('parentNode')) this.removeFromParent() ;  
     
     return YES ;
@@ -283,7 +306,7 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
   /** @private */
   keyDown: function(evt) {
     var ret = this.interpretKeyEvents(evt) ;
-    if(!ret) this.fieldValueDidChange(true);
+    this.fieldValueDidChange(true);
     return !ret ? NO : ret ;
   },
   
@@ -296,17 +319,22 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
   // remove it from the DOM key events are no longer sent to the browser.
   /** @private */
   willRemoveFromParent: function() {
-    this.$('input')[0].blur();
+    this.$input()[0].blur();
   },
   
   // ask owner to end editing.
   /** @private */
   willLoseFirstResponder: function(responder) {
     if (responder !== this) return;
+
+    // if we're about to lose first responder for any reason other than
+    // ending editing, make sure we clear the previous first responder so 
+    // isn't cached
+    this._previousFirstResponder = null;
     
     // should have been covered by willRemoveFromParent, but this was needed 
     // too.
-    this.$('input')[0].blur();
+    this.$input()[0].blur();
     return this.blurEditor() ;
   },
 
@@ -334,6 +362,7 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
   /** @private */
   insertNewline: function(evt) { 
     if (this._multiline) {
+      evt.allowDefault();
       return arguments.callee.base.call(this, evt) ;
     } else {
       // TODO : this is a work around. There is a bug where the 
@@ -354,8 +383,9 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
   // editable, begins editing.
   /** @private */
   insertTab: function(evt) {
-    var next = this._delegate.nextValidKeyView();
+    this.resignFirstResponder();
     this.commitEditing() ;
+    var next = this._delegate.nextValidKeyView();
     if(next) next.beginEditing();
     return YES ;
   },
@@ -366,9 +396,20 @@ SC.InlineTextFieldView = SC.TextFieldView.extend(SC.DelegateSupport,
     this.commitEditing() ;
     if(prev) prev.beginEditing();
     return YES ;
+  },
+  
+  /** @private */
+  deleteForward: function(evt) {
+    evt.allowDefault();
+    return YES;
+  },
+  
+  /** @private */
+  deleteBackward: function(evt) {
+    evt.allowDefault();
+    return YES ;
   }
-
-
+  
 });
 
 
@@ -459,6 +500,14 @@ SC.InlineTextFieldView.mixin(
     if(s && s.length>0) styles = styles + "line-height: " + s + " !important; ";
     s=SC.getStyle(el,'text-align');
     if(s && s.length>0) styles = styles + "text-align: " + s + " !important; ";
+    s=SC.getStyle(el,'top-margin');
+    if(s && s.length>0) styles = styles + "top-margin: " + s + " !important; ";
+    s=SC.getStyle(el,'bottom-margin');
+    if(s && s.length>0) styles = styles + "bottom-margin: " + s + " !important; ";
+    s=SC.getStyle(el,'left-margin');
+    if(s && s.length>0) styles = styles + "left-margin: " + s + " !important; ";
+    s=SC.getStyle(el,'right-margin');
+    if(s && s.length>0) styles = styles + "right-margin: " + s + " !important; ";
     
     return styles;
   },

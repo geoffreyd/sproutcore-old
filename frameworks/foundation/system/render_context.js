@@ -44,6 +44,8 @@ SC.MODE_PREPEND = 'prepend';
 */
 SC.RenderContext = SC.Builder.create(/** SC.RenderContext.fn */ {
   
+  SELF_CLOSING: SC.CoreSet.create().addEach('area base basefront br hr input img link meta'.w()),
+  
   /** 
     When you create a context you should pass either a tag name or an element
     that should be used as the basis for building the context.  If you pass
@@ -82,9 +84,7 @@ SC.RenderContext = SC.Builder.create(/** SC.RenderContext.fn */ {
       while(c) { c.length++; c = c.prevObject; }
       
       this.strings.push(null);
-      if (this._tagName === 'script') this._selfClosing = NO; // special case
-      if (this._tagName === 'div') this._selfClosing = NO; //  illegal in html 4.01
-      if (this._tagName === 'select') this._selfClosing = NO; //  illegal in html 4.01
+      this._selfClosing = this.SELF_CLOSING.contains(this._tagName);
     } else {
       this._elem = tagNameOrElement ;
       this._needsTag = NO ;
@@ -241,7 +241,7 @@ SC.RenderContext = SC.Builder.create(/** SC.RenderContext.fn */ {
   element: function() {  
     if (this._elem) return this._elem;
     // create factory div if needed
-    var ret ;
+    var ret, child;
     if (!SC.RenderContext.factory) {
       SC.RenderContext.factory = document.createElement('div');
     }
@@ -254,8 +254,12 @@ SC.RenderContext = SC.Builder.create(/** SC.RenderContext.fn */ {
     // reference to the first child, but it didnt work. 
     // Ended up cloning the first child.
     
-    var child = SC.RenderContext.factory.firstChild.cloneNode(true);
-    SC.RenderContext.factory.innerHTML = '';
+    if(SC.RenderContext.factory.innerHTML.length>0){
+      child = SC.RenderContext.factory.firstChild.cloneNode(true);
+      SC.RenderContext.factory.innerHTML = '';
+    } else {
+      child = null;
+    }
     return child ;
   },
   
@@ -885,8 +889,16 @@ SC.RenderContext.fn.css = SC.RenderContext.fn.addStyle;
   this method to avoid errors.  You can also do this with the text() helper
   method on a render context.
 */
+
+
+if (!SC.browser.isSafari || parseInt(SC.browser.version, 10) < 526) {
+  SC.RenderContext._safari3 = YES;
+}
+
 SC.RenderContext.escapeHTML = function(text) {
   var elem, node, ret ;
+  
+  if (SC.none(text)) return text; // ignore empty
   
   elem = this.escapeHTMLElement;
   if (!elem) elem = this.escapeHTMLElement = document.createElement('div');
@@ -899,7 +911,10 @@ SC.RenderContext.escapeHTML = function(text) {
   
   node.data = text ;
   ret = elem.innerHTML ;
-  node = elem = null;
   
+  // Safari 3 does not escape the '>' character
+  if (SC.RenderContext._safari3) { ret = ret.replace(/>/g, '&gt;'); }
+
+  node = elem = null;
   return ret ;
 };

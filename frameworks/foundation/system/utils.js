@@ -133,7 +133,7 @@ SC.mixin( /** @scope SC */ {
   rectsEqual: function(r1, r2, delta) {
     if (!r1 || !r2) return (r1 == r2) ;
     
-    if (delta == null) delta = 0.1;
+    if (delta === null) delta = 0.1;
     if ((r1.y != r2.y) && (Math.abs(r1.y - r2.y) > delta)) return NO ; 
     if ((r1.x != r2.x) && (Math.abs(r1.x - r2.x) > delta)) return NO ; 
     if ((r1.width != r2.width) && (Math.abs(r1.width - r2.width) > delta)) return NO ; 
@@ -243,6 +243,44 @@ SC.mixin( /** @scope SC */ {
     return '{' + keyValues.join(', ') + '}';
   },
   
+  /**
+    Given a string and a fixed width, calculates the height of that
+    block of text using a style string, a set of class names,
+    or both.
+
+    @param str {String} The text to calculate
+    @param width {Number} The fixed width to assume the text will fill
+    @param style {String} A CSS style declaration.  E.g., 'font-weight: bold'
+    @param classNames {Array} An array of class names that may affect the style
+    @returns {Number} The height of the text given the passed parameters
+  */
+  heightForString: function(str, width, style, classNames) {
+    var elem = this._heightCalcElement, classes, height;
+
+    // Coalesce the array of class names to one string, if the array exists
+    classes = (classNames && SC.typeOf(classNames) === SC.T_ARRAY) ? classNames.join(' ') : '';
+
+    if (!width) width = 100; // default to 100 pixels
+
+    // Only create the offscreen element once, then cache it
+    if (!elem) {
+      elem = this._heightCalcElement = document.createElement('div');
+      document.body.insertBefore(elem, null);
+    }
+
+    style = '%@; width: %@px; left: %@px; position: absolute'.fmt(style, width, (-1*width));
+    elem.setAttribute('style', style);
+
+    if (classes !== '') {
+      elem.setAttribute('class', classes);
+    }
+
+    elem.textContent = str;
+    height = elem.clientHeight;
+
+    elem = null; // don't leak memory
+    return height;
+  },
   
   /** Finds the absolute viewportOffset for a given element.
     This method is more accurate than the version provided by prototype.
@@ -340,8 +378,8 @@ SC.mixin( /** @scope SC */ {
   /** Returns the union of two ranges.  If one range is null, the other
    range will be returned.  */
   unionRanges: function(r1, r2) { 
-    if ((r1 == null) || (r1.length < 0)) return r2 ;
-    if ((r2 == null) || (r2.length < 0)) return r1 ;
+    if ((r1 === null) || (r1.length < 0)) return r2 ;
+    if ((r2 === null) || (r2.length < 0)) return r1 ;
     
     var min = Math.min(r1.start, r2.start) ;
     var max = Math.max(SC.maxRange(r1), SC.maxRange(r2)) ;
@@ -350,7 +388,7 @@ SC.mixin( /** @scope SC */ {
   
   /** Returns the intersection of the two ranges or SC.RANGE_NOT_FOUND */
   intersectRanges: function(r1, r2) {
-    if ((r1 == null) || (r2 == null)) return SC.RANGE_NOT_FOUND ;
+    if ((r1 === null) || (r2 === null)) return SC.RANGE_NOT_FOUND ;
     if ((r1.length < 0) || (r2.length < 0)) return SC.RANGE_NOT_FOUND;
     var min = Math.max(SC.minRange(r1), SC.minRange(r2)) ;
     var max = Math.min(SC.maxRange(r1), SC.maxRange(r2)) ;
@@ -360,7 +398,7 @@ SC.mixin( /** @scope SC */ {
   
   /** Returns the difference of the two ranges or SC.RANGE_NOT_FOUND */
   subtractRanges: function(r1, r2) {
-    if ((r1 == null) || (r2 == null)) return SC.RANGE_NOT_FOUND ;
+    if ((r1 === null) || (r2 === null)) return SC.RANGE_NOT_FOUND ;
     if ((r1.length < 0) || (r2.length < 0)) return SC.RANGE_NOT_FOUND;
     var max = Math.max(SC.minRange(r1), SC.minRange(r2)) ;
     var min = Math.min(SC.maxRange(r1), SC.maxRange(r2)) ;
@@ -378,8 +416,8 @@ SC.mixin( /** @scope SC */ {
   */
   rangesEqual: function(r1, r2) {
     if (r1===r2) return true ;
-    if (r1 == null) return r2.length < 0 ;
-    if (r2 == null) return r1.length < 0 ;
+    if (r1 === null) return r2.length < 0 ;
+    if (r2 === null) return r1.length < 0 ;
     return (r1.start == r2.start) && (r1.length == r2.length) ;
   },
 
@@ -411,7 +449,7 @@ SC.mixin( /** @scope SC */ {
 
     var h = (max == min) ? 0 : ((max == rgb[0]) ? ((rgb[1]-rgb[2])/(max-min)/6) : ((max == rgb[1]) ? ((rgb[2]-rgb[0])/(max-min)/6+1/3) : ((rgb[0]-rgb[1])/(max-min)/6+2/3)));
     h = (h < 0) ? (h + 1) : ((h > 1)  ? (h - 1) : h);
-    var s = (max == 0) ? 0 : (1 - min/max);
+    var s = (max === 0) ? 0 : (1 - min/max);
     var v = max/255;
     return [h, s, v];
   },

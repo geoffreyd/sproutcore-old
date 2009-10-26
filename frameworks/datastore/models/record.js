@@ -66,8 +66,13 @@ SC.Record = SC.Object.extend(
     
     @property {String}
   */
-  id: function() {
-    return SC.Store.idFor(this.storeKey);
+  id: function(key, value) {
+    if (value !== undefined) {
+      this.writeAttribute(this.get('primaryKey'), value);
+      return value;
+    } else {
+      return SC.Store.idFor(this.storeKey);
+    }
   }.property('storeKey').cacheable(),
   
   /**
@@ -103,6 +108,15 @@ SC.Record = SC.Object.extend(
   */
   storeKey: null,
 
+  /** 
+    YES when the record has been destroyed
+    
+    @property {Boolean}
+  */
+  isDestroyed: function() {
+    return !!(this.get('status') & SC.Record.DESTROYED);  
+  }.property('status').cacheable(),
+  
   /**
     YES when the record is in an editable state.  You can use this property to
     quickly determine whether attempting to modify the record would raise an 
@@ -270,20 +284,21 @@ SC.Record = SC.Object.extend(
     an editable version of the attribute using editableAttribute()
   
     @param {String} key the attribute you want to read
-    @param {Object} value the attribute you want to read
+    @param {Object} value the value you want to write
     @param {Boolean} ignoreDidChange only set if you do NOT want to flag 
       record as dirty
     @returns {SC.Record} receiver
-  **/
+  */
   writeAttribute: function(key, value, ignoreDidChange) {
     var store    = this.get('store'), 
         storeKey = this.storeKey,
         status   = store.peekStatus(storeKey),
+        recordAttr = this[key],
         attrs;
-        
+    
     attrs = store.readEditableDataHash(storeKey);
     if (!attrs) throw SC.Record.BAD_STATE_ERROR;
-    
+
     // if value is the same, do not flag record as dirty
     if (value !== attrs[key]) {
       if(!ignoreDidChange) this.beginEditing();
@@ -294,6 +309,7 @@ SC.Record = SC.Object.extend(
     // if value is primaryKey of record, write it to idsByStoreKey
     if (key===this.get('primaryKey')) {
       SC.Store.idsByStoreKey[storeKey] = attrs[key] ;
+      this.propertyDidChange('id'); // Reset computed value
     }
 
     return this ;  
@@ -401,13 +417,28 @@ SC.Record = SC.Object.extend(
     If you try to get/set a property not defined by the record, then this 
     method will be called. It will try to get the value from the set of 
     attributes.
+    
+    This will also check is ignoreUnknownProperties is set on the recordType
+    so that they will not be written to dataHash unless explicitly defined
+    in the model schema.
   
     @param {String} key the attribute being get/set
     @param {Object} value the value to set the key to, if present
     @returns {Object} the value
   */
   unknownProperty: function(key, value) {
+    
     if (value !== undefined) {
+      
+      // first check if we should ignore unknown properties for this 
+      // recordType
+      var storeKey = this.get('storeKey'),
+        recordType = SC.Store.recordTypeFor(storeKey);
+      
+      if(recordType.ignoreUnknownProperties===YES) {
+        this[key] = value;
+        return value;
+      }
       
       // if we're modifying the PKEY, then SC.Store needs to relocate where 
       // this record is cached. store the old key, update the value, then let 
@@ -417,7 +448,7 @@ SC.Record = SC.Object.extend(
 
       // update ID if needed
       if (key === primaryKey) {
-        SC.Store.replaceIdFor(this.get('storeKey'), value);
+        SC.Store.replaceIdFor(storeKey, value);
       }
       
     }
@@ -459,7 +490,7 @@ SC.Record = SC.Object.extend(
     @property {SC.Record}
   */
   errorValue: function() {
-    return this.get('isError') ? this : null;
+    return this.get('isError') ? SC.val(this.get('errorObject')) : null ;
   }.property('isError').cacheable(),
   
   /**
@@ -512,6 +543,15 @@ SC.Record = SC.Object.extend(
 
 // Class Methods
 SC.Record.mixin( /** @scope SC.Record */ {
+
+  /**
+    Whether to ignore unknown properties when they are being set on the record
+    object. This is useful if you want to strictly enforce the model schema
+    and not allow dynamically expanding it by setting new unknown properties
+    
+    @property {Boolean}
+  */
+  ignoreUnknownProperties: NO,
 
   // ..........................................................
   // CONSTANTS

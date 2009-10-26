@@ -4,7 +4,7 @@
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
 
-/*global module test equals context ok same */
+/*global module test equals context ok same should_throw*/
 var set ;
 module("SC.IndexSet#add", {
   setup: function() {
@@ -193,3 +193,20 @@ test("add raises exception when frozen", function() {
   }, SC.FROZEN_ERROR);  
 });
 
+// ..........................................................
+// SPECIAL CASES
+// 
+// demonstrate fixes for specific bugs here.
+
+test("adding in the same range should keep length consistent", function() {
+  set = SC.IndexSet.create();
+  set.add(1,4);
+  equals(set.length, 4, 'set length should be 4');
+  
+  set.add(1,3); // should be like a no-op
+  equals(set.length, 4, 'set length should remain 4 after set.add(1,3)');
+
+  set.add(1,2); // should be like a no-op
+  equals(set.length, 4, 'set length should remain 4 after set.add(1,2)');
+  
+});

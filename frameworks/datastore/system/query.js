@@ -107,7 +107,7 @@ sc_require('models/record');
   - >=
   - BEGINS_WITH (checks if a string starts with another one)
   - ENDS_WITH   (checks if a string ends with another one)
-  - CONTAINS    (checks if a string contains another one)
+  - CONTAINS    (checks if a string contains another one, or if an object is in an array)
   - MATCHES     (checks if a string is matched by a regexp,
                 you will have to use a parameter to insert the regexp)
   - ANY         (checks if the thing on its left is contained in the array
@@ -304,6 +304,13 @@ SC.Query = SC.Object.extend(SC.Copyable, SC.Freezable,
   isLocal: function() {
     return this.get('location') === SC.Query.LOCAL;
   }.property('location').cacheable(),
+  
+  /**
+    Indicates whether a record is editable or not.  Defaults to NO.  Local
+    queries should never be made editable.  Remote queries may be editable or
+    not depending on the data source.
+  */
+  isEditable: NO,
   
   // ..........................................................
   // PRIMITIVE METHODS
@@ -727,10 +734,24 @@ SC.Query = SC.Object.extend(SC.Copyable, SC.Freezable,
       evalType:         'BOOLEAN',
 
       /** @ignore */
-      evaluate:         function (r,w) {
-                          var all    = this.leftSide.evaluate(r,w);
-                          var substr = this.rightSide.evaluate(r,w);
-                          return (all.indexOf(substr) !== -1);
+        evaluate:       function (r,w) {
+                          var all    = this.leftSide.evaluate(r,w) || [];
+                          var value = this.rightSide.evaluate(r,w);
+                          switch(SC.typeOf(all)) {
+                            case SC.T_STRING:
+                              return (all.indexOf(value) !== -1); 
+                            case SC.T_ARRAY:
+                              var found  = false;
+                              var i      = 0;
+                              while ( found===false && i<all.length ) {
+                                if ( value == all[i] ) found = true;
+                                i++;
+                              }
+                              return found;
+                            default:
+                              //do nothing
+                              break;
+                          }
                         }
     },
 

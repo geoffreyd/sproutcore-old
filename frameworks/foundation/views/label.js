@@ -74,6 +74,11 @@ SC.LabelView = SC.View.extend(SC.Control,
   */
   value: '',
   
+  /**
+    The hint to display if no value is set.  Should be used only if isEditable
+    is set to YES.
+  */
+  hint: null,
 
   /**
     The exampleInlineTextFieldView property is by default a 
@@ -96,6 +101,11 @@ SC.LabelView = SC.View.extend(SC.Control,
     Set the alignment of the label view.
   */
   textAlign: SC.ALIGN_LEFT,
+  
+  /**
+    If you want the inline editor to be multiline set this property to YES.
+  */
+  isInlineEditorMultiline: NO,
   
   /**
     [RO] The value that will actually be displayed.
@@ -192,7 +202,7 @@ SC.LabelView = SC.View.extend(SC.Control,
       delegate: this,
       exampleElement: el,
       value: value, 
-      multiline: NO, 
+      multiline: this.get('isInlineEditorMultiline'), 
       isCollection: NO,
       validator: this.get('validator'),
       exampleInlineTextFieldView: this.get('exampleInlineTextFieldView')
@@ -256,8 +266,9 @@ SC.LabelView = SC.View.extend(SC.Control,
   _TEMPORARY_CLASS_HASH: {},
   
   render: function(context, firstTime) {
-    var value = this.get('displayValue');
-    var icon = this.get('icon') ;
+    var value = this.get('displayValue'),
+        icon = this.get('icon'),
+        hint = this.get('hint');
     
     // add icon if needed
     if (icon) {
@@ -267,8 +278,13 @@ SC.LabelView = SC.View.extend(SC.Control,
       context.push(icon);
     }
     
-    // add display value
-    context.push(value);
+    // if there is a hint set and no value, render the hint
+    // otherwise, render the value
+    if (hint && (!value || value === '')) {
+      context.push('<span class="sc-hint">', hint, '</span>');
+    } else { 
+      context.push(value);
+    }
     
     // and setup alignment and font-weight on styles
     context.addStyle('text-align',  this.get('textAlign'))

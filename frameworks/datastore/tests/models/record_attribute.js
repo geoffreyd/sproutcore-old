@@ -6,7 +6,7 @@
 /*globals module ok equals same test MyApp */
 
 // test core array-mapping methods for RecordArray with RecordAttribute
-var storeKeys, rec, rec2, bar ;
+var storeKeys, rec, rec2, bar, MyApp;
 
 module("SC.RecordAttribute core methods", {
   setup: function() {

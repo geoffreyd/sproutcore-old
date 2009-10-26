@@ -4,6 +4,7 @@
 //            Portions ©2008-2009 Apple Inc. All rights reserved.
 // License:   Licened under MIT license (see license.js)
 // ==========================================================================
+/*globals CQ*/
 
 require('system/builder') ;
 
@@ -1279,7 +1280,7 @@ SC.CoreQuery = (function() {
         // If the element isn't reporting its values properly in Safari
         // then some display: none elements are involved
         } else {
-          var swap = [], stack = [], a = elem, i = 0;
+          var swap = [], stack = [], a = elem, i = 0, swLen, stLen;
 
           // Locate all of the parent display: none elements
           for ( ; a && styleIsBorked(a); a = a.parentNode ) stack.unshift(a);
@@ -1287,7 +1288,7 @@ SC.CoreQuery = (function() {
           // Go through and make them visible, but in reverse
           // (It would be better if we knew the exact display type that they 
           // had)
-          for ( ; i < stack.length; i++ ) {
+          for (stLen = stack.length ; i < stLen; i++ ) {
             if (styleIsBorked(stack[i])) {
               swap[i] = stack[i].style.display;
               stack[i].style.display = "block";
@@ -1300,7 +1301,7 @@ SC.CoreQuery = (function() {
             (computedStyle && computedStyle.getPropertyValue(name)) || "";
 
           // Finally, revert the display styles back
-          for ( i = 0; i < swap.length; i++ ) {
+          for ( i = 0, swLen = swap.length; i < swLen; i++ ) {
             if (swap[i]!=null) stack[i].style.display = swap[i];
           }
         }
@@ -1723,7 +1724,7 @@ SC.CoreQuery = (function() {
 
         // Mozilla does not add the border for a parent that has overflow != 
         // visible
-        if ( mozilla && css(parent, "overflow") != "visible" ) border(parent);
+        if ( br.mozilla && css(parent, "overflow") != "visible" ) border(parent);
 
         // Get next parent
         parent = parent.parentNode;

@@ -102,7 +102,7 @@ SC.MenuItemView = SC.ButtonView.extend( SC.ContentDisplay,
     @readOnly
     @type String
   */
-  contentCheckboxKey: null,
+  contentCheckboxKey: 'checkbox',
 
   /**
     The name of the property which will set the checkbox image for the menu 
@@ -113,12 +113,6 @@ SC.MenuItemView = SC.ButtonView.extend( SC.ContentDisplay,
   */
   contentActionKey: null,
   
-  /**
-    The name of the property which will set the checkbox state
-	
-    @type Boolean
-  */
-  isCheckboxChecked: NO,  
   
   /**
     Describes the width of the menu item    
@@ -163,7 +157,7 @@ SC.MenuItemView = SC.ButtonView.extend( SC.ContentDisplay,
     This will hold the properties that can trigger a change in the diplay
   */
   displayProperties: ['contentValueKey', 'contentIconKey', 'shortCutKey',
-                  'contentIsBranchKey','isCheckboxChecked','itemHeight',
+                  'contentIsBranchKey', 'itemHeight',
                    'subMenu','isEnabled','content'],
   contentDisplayProperties: 'title value icon separator action checkbox shortcut branchItem subMenu'.w(),
   /**
@@ -213,7 +207,10 @@ SC.MenuItemView = SC.ButtonView.extend( SC.ContentDisplay,
       key = this.getDelegateProperty('contentIconKey', del) ;
       val = (key && content) ? (content.get ? content.get(key) : content[key]) : null ;
       if(val && SC.typeOf(val) !== SC.T_STRING) val = val.toString() ;
-      if(val) this.renderImage(ic, val) ;
+      if(val) {
+        this.renderImage(ic, val) ;
+        ic.addClass('hasIcon') ;
+      }
 
       // handle label -- always invoke
       key = this.getDelegateProperty('contentValueKey', del) ;
@@ -423,6 +420,17 @@ SC.MenuItemView = SC.ButtonView.extend( SC.ContentDisplay,
   isAnchorMouseDown: NO,
 
   mouseUp: function(evt) {
+    // SproutCore's event system will deliver the mouseUp event to the view
+    // that got the mouseDown event, but for menus we want to track the mouse,
+    // so we'll do our own dispatching.
+    var parentMenu = this.parentMenu() ;
+    if (parentMenu) {
+      var selectedMenuItem = parentMenu.get('currentSelectedMenuItem') ;
+      if (selectedMenuItem  &&  (this !== selectedMenuItem)) {
+        return selectedMenuItem.tryToPerform('mouseUp', evt) ;
+      }
+    }
+
     if (!this.get('isEnabled')) {
       this.set('hasMouseExited',NO) ;
       return YES ;
@@ -432,12 +440,11 @@ SC.MenuItemView = SC.ButtonView.extend( SC.ContentDisplay,
     var content = this.get('content') ;
     if (key) {
       if (content && content.get(key)) {
-        this.$('.checkbox').setClass('inactive', YES) ;
         content.set(key, NO) ;
       } else if( content.get(key)!== undefined ) {
-        this.$('.checkbox').removeClass('inactive') ;
         content.set(key, YES) ;
       }
+      this.displayDidChange();
     }
     this._action(evt) ;
     var anchor = this.getAnchor() ;

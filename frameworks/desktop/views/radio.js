@@ -118,8 +118,7 @@ SC.RadioView = SC.FieldView.extend(
       titleKey = this.get('itemTitleKey'), valueKey = this.get('itemValueKey'),
       isEnabledKey = this.get('itemIsEnabledKey'), 
       iconKey = this.get('itemIconKey');
-      
-    var ret = [], max = (items)? items.length : 0 ;
+    var ret = [], max = (items)? items.get('length') : 0 ;
     var item, title, value, idx, isArray, isEnabled, icon;
     
     for(idx=0;idx<max;idx++) {
@@ -241,7 +240,7 @@ SC.RadioView = SC.FieldView.extend(
         input = this.$(input);
         idx = parseInt(input.val(),0);
         item = (idx>=0) ? items[idx] : null;
-        
+
         input.attr('disabled', (!item[2]) ? 'disabled' : null);
         selectionState = this._getSelectionState(item, value, isArray, true);
 
@@ -336,22 +335,23 @@ SC.RadioView = SC.FieldView.extend(
   didCreateLayer: function() {
      this.setFieldValue(this.get('fieldValue'));
      var inputElems=this.$input();
-     for( var i=0; i<inputElems.length; i++){
+     for( var i=0, inputLen = inputElems.length; i<inputLen; i++){
        SC.Event.add(inputElems[i], 'click', this, this._field_fieldValueDidChange) ;
      }
    },
 
   willDestroyLayer: function() {
        var inputElems=this.$input();
-        for( var i=0; i<inputElems.length; i++){
+        for( var i=0, inputLen = inputElems.length; i<inputLen; i++){
             SC.Event.remove(this.$input()[i], 'click', this, this._field_fieldValueDidChange); 
         }
    
   },
   
   mouseDown: function(evt) {  
-    this.$input()[0].focus();
-    sc_super();
+    this.set('isActive', YES);
+    this._field_isMouseDown = YES;
+    return YES;
   }
 
 });

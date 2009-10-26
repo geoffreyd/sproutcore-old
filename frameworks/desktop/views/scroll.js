@@ -59,6 +59,12 @@ SC.ScrollView = SC.View.extend(SC.Border, {
     if (!this.get('canScrollHorizontal')) return 0 ;
     var view = this.get('contentView') ;
     var contentWidth = view ? view.get('frame').width : 0 ;
+    
+    // The following code checks if there is a calculatedWidth (collections)
+    // to avoid looking at the incorrect value calculated by frame.
+    if(view.calculatedWidth && view.calculatedWidth!==0){
+      contentWidth = view.calculatedWidth; 
+    }
     var containerWidth = this.get('containerView').get('frame').width ;
     return Math.max(0, contentWidth-containerWidth) ;
   }.property(),
@@ -73,7 +79,13 @@ SC.ScrollView = SC.View.extend(SC.Border, {
   maximumVerticalScrollOffset: function() {
     if (!this.get('canScrollVertical')) return 0 ;
     var view = this.get('contentView') ;
-    var contentHeight = view ? view.get('frame').height : 0 ;
+    var contentHeight = (view && view.get('frame')) ? view.get('frame').height : 0 ;
+    
+    // The following code checks if there is a calculatedWidth (collections)
+    // to avoid looking at the incorrect value calculated by frame.
+    if(view.calculatedHeight && view.calculatedHeight!==0){
+      contentHeight = view.calculatedHeight; 
+    }
     var containerHeight = this.get('containerView').get('frame').height ;
     return Math.max(0, contentHeight-containerHeight) ;
   }.property(),
@@ -302,31 +314,36 @@ SC.ScrollView = SC.View.extend(SC.Border, {
     the view should be a subview of the contentView.  Otherwise the results
     will be undefined.
     
-    @param {SC.ScrollView} receiver
+    @param {SC.View} view view to scroll or null to scroll receiver visible
+    @returns {Boolean} YES if scroll position was changed
   */
   scrollToVisible: function(view) {
-    var contentView = this.get('contentView') ;
-    if (!contentView) return this; // nothing to do if no contentView.
     
-    // get the viewportOffset for the view layer the convert that.  this will
-    // work even  with views using static layout.
-    var layer = view.get('layer'), vf ;
-    if(!layer) return this ; // nothing to do
-    vf =  SC.viewportOffset(layer) ;
-    vf.width = layer.offsetWidth ;
-    vf.height = layer.offsetHeight ;
+    // if no view is passed, do default
+    if (arguments.length === 0) return sc_super(); 
+    
+    var contentView = this.get('contentView') ;
+    if (!contentView) return NO; // nothing to do if no contentView.
+
+    // get the frame for the view - should work even for views with static 
+    // layout, assuming it has been added to the screen.
+    var vf = view.get('frame');
+    if (!vf) return NO; // nothing to do
     
     // convert view's frame to an offset from the contentView origin.  This
     // will become the new scroll offset after some adjustment.
-    vf = contentView.convertFrameFromView(vf, view.get('parentView'));
+    vf = contentView.convertFrameFromView(vf, view.get('parentView')) ;
     var cf = contentView.get('frame');
     vf.x -= cf.x;
     vf.y -= cf.y;
     
     // find current visible frame.
     var vo = SC.cloneRect(this.get('containerView').get('frame')) ;
+    
     vo.x = this.get('horizontalScrollOffset') ;
     vo.y = this.get('verticalScrollOffset') ;
+
+    var origX = vo.x, origY = vo.y;
     
     // add in offset of container
     layer = this.get('containerView').get('layer');
@@ -348,7 +365,10 @@ SC.ScrollView = SC.View.extend(SC.Border, {
     vo.y -= cf.y ;
     
     // scroll to that origin.
-    return this.scrollTo(vo.x, vo.y) ;
+    if ((origX !== vo.x) || (origY !== vo.y)) {
+      this.scrollTo(vo.x, vo.y);
+      return YES ;
+    } else return NO;
   },
   
   /**
@@ -539,10 +559,8 @@ SC.ScrollView = SC.View.extend(SC.Border, {
     in the regular properties.
   */
   createChildViews: function() {
-    // debugger ;
-    var childViews = [] ;
-    var view ;
-    
+    var childViews = [] , view; 
+       
     // create the containerView.  We must always have a container view. 
     // also, setup the contentView as the child of the containerView...
     if (SC.none(view = this.containerView)) view = SC.ContainerView;
@@ -558,7 +576,8 @@ SC.ScrollView = SC.View.extend(SC.Border, {
     if (view=this.horizontalScrollerView) {
       if (this.get('hasHorizontalScroller')) {
         view = this.horizontalScrollerView = this.createChildView(view, {
-          layoutDirection: SC.LAYOUT_HORIZONTAL
+          layoutDirection: SC.LAYOUT_HORIZONTAL,
+          valueBinding: '*owner.horizontalScrollOffset'
         }) ;
         childViews.push(view);
       } else this.horizontalScrollerView = null ;
@@ -568,7 +587,8 @@ SC.ScrollView = SC.View.extend(SC.Border, {
     if (view=this.verticalScrollerView) {
       if (this.get('hasVerticalScroller')) {
         view = this.verticalScrollerView = this.createChildView(view, {
-          layoutDirection: SC.LAYOUT_VERTICAL
+          layoutDirection: SC.LAYOUT_VERTICAL,
+          valueBinding: '*owner.verticalScrollOffset'
         }) ;
         childViews.push(view);
       } else this.verticalScrollerView = null ;
@@ -577,7 +597,7 @@ SC.ScrollView = SC.View.extend(SC.Border, {
     // set childViews array.
     this.childViews = childViews ;
     
-    this.contentViewFrameDidChange() ; // setup initial display...
+    this.contentViewDidChange() ; // setup initial display...
     this.tile() ; // set up initial tiling
   },
   
@@ -632,7 +652,12 @@ SC.ScrollView = SC.View.extend(SC.Border, {
     size of the contentView changes.  We don't care about the origin since
     that is tracked separately from the offset values.
   */
+  
+  oldMaxHOffset: 0,
+  oldMaxVOffset: 0,
+  
   contentViewFrameDidChange: function() {
+        
     var view   = this.get('contentView'), 
         f      = (view) ? view.get('frame') : null,
         width  = (f) ? f.width : 0,  
@@ -640,7 +665,7 @@ SC.ScrollView = SC.View.extend(SC.Border, {
         dim    = this.get('frame') ;
     
     // cache out scroll settings...
-    if ((width === this._scroll_contentWidth) && (height === this._scroll_contentHeight)) return ;
+    //if ((width === this._scroll_contentWidth) && (height === this._scroll_contentHeight)) return ;
     this._scroll_contentWidth = width;
     this._scroll_contentHeight = height ;
     
@@ -662,6 +687,33 @@ SC.ScrollView = SC.View.extend(SC.Border, {
       height -= this.get('verticalScrollerBottom') ;
       view.setIfChanged('maximum', height) ;
     }
+    
+    // If there is no vertical scroller and auto hiding is on, make
+    // sure we are at the top if not already there
+    if (!this.get('isVerticalScrollerVisible') && (this.get('verticalScrollOffset') !== 0) && 
+       this.get('autohidesVerticalScroller')) {
+      this.set('verticalScrollOffset', 0);
+    }
+    
+    // Same thing for horizontal scrolling.
+    if (!this.get('isHorizontalScrollerVisible') && (this.get('horizontalScrollOffset') !== 0) && 
+       this.get('autohidesHorizontalScroller')) {
+      this.set('horizontalScrollOffset', 0);
+    }
+    
+    // This forces to recalculate the height of the frame when is at the bottom
+    // of the scroll and the content dimension are smaller that the previous one
+    
+    
+    var mxVOffSet = this.get('maximumVerticalScrollOffset'),
+        vOffSet = this.get('verticalScrollOffset'),
+        mxHOffSet = this.get('maximumHorizontalScrollOffset'),
+        hOffSet = this.get('horizontalScrollOffset');
+    var forceHeight = mxVOffSet && this.get('hasVerticalScroller') && mxVOffSet<vOffSet;
+    var forceWidth = mxHOffSet && this.get('hasHorizontalScroller') && mxHOffSet<hOffSet;
+    if(forceHeight || forceWidth){
+      this.forceDimensionsRecalculation(forceWidth, forceHeight, vOffSet, hOffSet);
+    }
   },
   
   /** @private
@@ -671,15 +723,12 @@ SC.ScrollView = SC.View.extend(SC.Border, {
   _scroll_horizontalScrollOffsetDidChange: function() {
     var offset = this.get('horizontalScrollOffset');
     
+    offset = Math.max(0,Math.min(this.get('maximumHorizontalScrollOffset'), offset)) ;
+    
     // update the offset for the contentView...
     var contentView = this.get('contentView');
     if (contentView) contentView.adjust('left', 0-offset);
-    
-    // update the value of the horizontal scroller...
-    var scroller ;
-    if (this.get('hasHorizontalScroller') && (scroller=this.get('horizontalScrollerView'))) {
-      scroller.set('value', offset);
-    }
+     
   }.observes('horizontalScrollOffset'),
   
   /** @private
@@ -689,15 +738,32 @@ SC.ScrollView = SC.View.extend(SC.Border, {
   _scroll_verticalScrollOffsetDidChange: function() {
     var offset = this.get('verticalScrollOffset') ;
     
+    offset = Math.max(0,Math.min(this.get('maximumVerticalScrollOffset'), offset)) ;
+    
     // update the offset for the contentView...
     var contentView = this.get('contentView');
+    var containerView = this.get('containerView');
+    
+    // Optimization when not using collections. We need to reimplement clippingFrame
+    // and scrolling to be able to scroll using scrolltop. For now I just
+    // detect if the content to scroll is a class of collectionView.
     if (contentView) contentView.adjust('top', 0-offset) ;
     
-    // update the value of the vertical scroller...
-    var scroller;
-    if (this.get('hasVerticalScroller') && (scroller=this.get('verticalScrollerView'))) {
-      scroller.set('value', offset) ;
+  }.observes('verticalScrollOffset'),
+  
+  forceDimensionsRecalculation: function (forceWidth, forceHeight, vOffSet, hOffSet) {
+    var oldScrollHOffset = hOffSet;
+    var oldScrollVOffset = vOffSet;
+    this.scrollTo(0,0);
+    if(forceWidth && forceHeight){
+      this.scrollTo(this.get('maximumHorizontalScrollOffset'), this.get('maximumVerticalScrollOffset'));
     }
-  }.observes('verticalScrollOffset')
+    if(forceWidth && !forceHeight){
+      this.scrollTo(this.get('maximumHorizontalScrollOffset'), oldScrollVOffset);
+    }
+    if(!forceWidth && forceHeight){
+      this.scrollTo(oldScrollHOffset ,this.get('maximumVerticalScrollOffset'));
+    }
+  }
   
 });

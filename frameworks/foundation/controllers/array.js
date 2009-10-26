@@ -284,7 +284,7 @@ SC.ArrayController = SC.Controller.extend(SC.Array, SC.SelectionSupport,
     // if we can do this, then just forward the change.  This should fire
     // updates back up the stack, updating rangeObservers, etc.
     var content = this.get('content'); // note: use content, not observable
-    var objsToDestroy = [], i;
+    var objsToDestroy = [], i, objsLen;
     if (this.get('destroyOnRemoval')){
       for(i=0; i<amt; i++){
         objsToDestroy.push(content.objectAt(i+start));
@@ -292,7 +292,7 @@ SC.ArrayController = SC.Controller.extend(SC.Array, SC.SelectionSupport,
     }
     
     if (content) content.replace(start, amt, objects);
-    for(i=0; i<objsToDestroy.length; i++){
+    for(i=0, objsLen = objsToDestroy.length; i<objsLen; i++){
       
       objsToDestroy[i].destroy();
     }
@@ -300,7 +300,12 @@ SC.ArrayController = SC.Controller.extend(SC.Array, SC.SelectionSupport,
     
     return this; 
   },
-  
+
+  indexOf: function(object, startAt) {
+    var content = this._scac_observableContent();
+    return content ? content.indexOf(object, startAt) : -1;
+  },
+
   // ..........................................................
   // INTERNAL SUPPORT
   // 
@@ -366,11 +371,10 @@ SC.ArrayController = SC.Controller.extend(SC.Array, SC.SelectionSupport,
     default:
       throw "%@.orderBy must be Array, String, or Function".fmt(this);
     }
-    
-    len = orderBy.get('length');
-    
+        
     // generate comparison function if needed - use orderBy
-    if (!func) {
+    if (!func) {  
+      len = orderBy.get('length');
       func = function(a,b) {
         var idx=0, status=0, key, aValue, bValue;
         for(idx=0;(idx<len)&&(status===0);idx++) {
@@ -456,11 +460,12 @@ SC.ArrayController = SC.Controller.extend(SC.Array, SC.SelectionSupport,
     Whenever enumerable content changes, need to regenerate the 
     observableContent and notify that the range has changed.  
     
-    IMPORTANT: Assumes content is not null and is enumerable
+    This is called whenever the content enumerable changes or whenever orderBy
+    changes.
   */
   _scac_enumerableDidChange: function() {
     var content = this.get('content'), // use content directly
-        newlen  = content.get('length'),
+        newlen  = content ? content.get('length') : 0,
         oldlen  = this._scac_length;
         
     this._scac_length = newlen;
@@ -469,7 +474,7 @@ SC.ArrayController = SC.Controller.extend(SC.Array, SC.SelectionSupport,
     this.enumerableContentDidChange(0, newlen, newlen-oldlen);
     this.endPropertyChanges();
     this.updateSelectionAfterContentChange();
-  },
+  }.observes('orderBy'),
   
   /** @private
     Whenever array content changes, need to simply forward notification.
