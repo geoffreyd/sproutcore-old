@@ -7,6 +7,15 @@
 
 /*global NodeList */
 
+var sc_assert = function(test) {
+  if (!test) throw "Assertion failed." ;
+};
+var sc_precondition = sc_assert ;
+var sc_postcondition = sc_assert ;
+var sc_invariant = sc_assert ;
+var sc_error = function() { throw "Error detected."; };
+var sc_allege = sc_assert ; // test always happens, even with assertions disabled
+
 // These commands are used by the build tools to control load order.  On the
 // client side these are a no-op.
 var require = require || function require() { } ;
