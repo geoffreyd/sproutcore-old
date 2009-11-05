@@ -289,6 +289,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {Number} edit status
   */
   storeKeyEditState: function(storeKey) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var editables = this.editables, locks = this.locks;
     return (editables && editables[storeKey]) ? SC.Store.EDITABLE : SC.Store.LOCKED ;
   },
@@ -302,6 +303,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {Hash} data hash or null
   */
   readDataHash: function(storeKey) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     return this.dataHashes[storeKey];
   },
   
@@ -317,6 +319,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {Hash} the attributes hash
   */
   readEditableDataHash: function(storeKey) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     // read the value - if there is no hash just return; nothing to do
     var ret = this.dataHashes[storeKey];
     if (!ret) return ret ; // nothing to do.
@@ -342,6 +345,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {Object} editable property value
   */
   readEditableProperty: function(storeKey, propertyName) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var hash      = this.readEditableDataHash(storeKey), 
         editables = this.editables[storeKey], // get editable info...
         ret       = hash[propertyName];
@@ -377,7 +381,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {SC.Store} receiver
   */
   writeDataHash: function(storeKey, hash, status) {
-
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     // update dataHashes and optionally status.
     if (hash) this.dataHashes[storeKey] = hash;
     if (status) this.statuses[storeKey] = status ;
@@ -408,6 +412,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {SC.Store} reciever
   */
   removeDataHash: function(storeKey, status) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var rev ;
     
      // don't use delete -- that will allow parent dataHash to come through
@@ -430,6 +435,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {Number} status
   */
   readStatus: function(storeKey) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     // use readDataHash to handle optimistic locking.  this could be inlined
     // but for now this minimized copy-and-paste code.
     this.readDataHash(storeKey);
@@ -445,6 +451,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {Number} status
   */
   peekStatus: function(storeKey) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     return this.statuses[storeKey] || SC.Record.EMPTY;  
   },
   
@@ -459,6 +466,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {SC.Store} receiver
   */
   writeStatus: function(storeKey, newStatus) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     // use writeDataHash for now to handle optimistic lock.  maximize code 
     // reuse.
     return this.writeDataHash(storeKey, null, newStatus);
@@ -494,6 +502,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     
     for(idx=0;idx<len;idx++) {
       if (isArray) storeKey = storeKeys[idx];
+      sc_precondition(typeof storeKey === SC.T_NUMBER);
       this.revisions[storeKey] = rev;
       this._notifyRecordPropertyChange(storeKey, statusOnly, key);
     }
@@ -506,7 +515,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     and execute flush() once at the end of the runloop.
   */
   _notifyRecordPropertyChange: function(storeKey, statusOnly, key) {
-    
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var records      = this.records, 
         nestedStores = this.get('nestedStores'),
         K            = SC.Store,
@@ -598,6 +607,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
         rec, recordType, statusOnly, idx, len, storeKey, keys;
     
     storeKeys.forEach(function(storeKey) {
+      sc_precondition(typeof storeKey === SC.T_NUMBER);
       if (records.contains(storeKey)) {
         statusOnly = hasDataChanges.contains(storeKey) ? NO : YES;
         rec = this.records[storeKey];
@@ -652,6 +662,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     var records = this.records, storeKey;
     if (records) {
       for(storeKey in records) {
+        sc_precondition(typeof storeKey === SC.T_NUMBER);
         if (!records.hasOwnProperty(storeKey)) continue ;
         this._notifyRecordPropertyChange(storeKey, NO);
       }
@@ -699,7 +710,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     
     for(i=0;i<len;i++) {
       storeKey = changes[i];
-      
+      sc_precondition(typeof storeKey === SC.T_NUMBER);
       // now copy changes
       myDataHashes[storeKey] = chDataHashes[storeKey];
       myStatuses[storeKey]   = chStatuses[storeKey];
@@ -739,6 +750,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     if (locks && revs) {
       for(i=0;i<len;i++) {
         storeKey = changes[i];
+        sc_precondition(typeof storeKey === SC.T_NUMBER);
         lock = locks[storeKey] || 1;
         rev  = revs[storeKey] || 1;
         
@@ -1003,6 +1015,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     var K = SC.Record.EMPTY ;
     for (id in storeKeysById) {
       storeKey = storeKeysById[id] ; // get the storeKey
+      sc_precondition(typeof storeKey === SC.T_NUMBER);
       if (this.readStatus(storeKey) !== K) {
         storeKeys.push(storeKey) ;
       }
@@ -1030,6 +1043,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {SC.Record} Returns a record instance.
   */
   materializeRecord: function(storeKey) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var records = this.records, ret, recordType, attrs;
     
     // look up in cached records
@@ -1086,7 +1100,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     
     // Next get the storeKey - base on id if available
     storeKey = id ? recordType.storeKeyFor(id) : SC.Store.generateStoreKey();
-    
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     // now, check the state and do the right thing.
     status = this.readStatus(storeKey);
     
@@ -1161,6 +1175,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
   */
   destroyRecord: function(recordType, id, storeKey) {
     if (storeKey === undefined) storeKey = recordType.storeKeyFor(id);
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var status = this.readStatus(storeKey), changelog, K = SC.Record;
     
     // handle status - ignore if destroying or destroyed
@@ -1236,6 +1251,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
       len = storeKeys.length;
       for(idx=0;idx<len;idx++) {
         storeKey = storeKeys ? storeKeys[idx] : undefined ;
+        sc_precondition(typeof storeKey === SC.T_NUMBER);
         this.destroyRecord(undefined, undefined, storeKey);
       }
     }
@@ -1255,6 +1271,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
   */
   recordDidChange: function(recordType, id, storeKey, key) {
     if (storeKey === undefined) storeKey = recordType.storeKeyFor(id);
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var status = this.readStatus(storeKey), changelog, K = SC.Record;
     
     // BUSY_LOADING, BUSY_CREATING, BUSY_COMMITTING, BUSY_REFRESH_CLEAN
@@ -1320,12 +1337,14 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
           if (isArray) recordType = recordTypes[idx] || SC.Record;
           id = ids ? ids[idx] : undefined ;
           storeKey = storeKeys ? storeKeys[idx] : undefined ;
+          sc_precondition(typeof storeKey === SC.T_NUMBER);
           this.recordDidChange(recordType, id, storeKey);
         }
       }else{
         len = storeKeys.length;
         for(idx=0;idx<len;idx++) {
           storeKey = storeKeys ? storeKeys[idx] : undefined ;
+          sc_precondition(typeof storeKey === SC.T_NUMBER);
           this.recordDidChange(undefined, undefined, storeKey);
         }
       }
@@ -1371,7 +1390,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
         if (isArray) recordType = recordTypes[idx];
         storeKey = recordType.storeKeyFor(ids[idx]);
       }
-      
+      sc_precondition(typeof storeKey === SC.T_NUMBER);
       // collect status and process
       status = this.readStatus(storeKey);
       
@@ -1415,6 +1434,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
       rev = SC.Store.generateStoreKey();
       for(idx=0;idx<len;idx++) {
         storeKey = ret[idx];
+        sc_precondition(typeof storeKey === SC.T_NUMBER);
         status   = this.readStatus(storeKey);
         if (status === K.BUSY_LOADING) {
           this.writeStatus(storeKey, K.ERROR);
@@ -1454,6 +1474,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
         ret;
     
     if (storeKey) {
+      sc_precondition(typeof storeKey === SC.T_NUMBER);
       array[0] = storeKey;
       storeKey = array;
       id = null ;
@@ -1538,7 +1559,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
         else recordType = recordTypes;
         storeKey = recordType.storeKeyFor(ids[idx]);
       }
-      
+      sc_precondition(typeof storeKey === SC.T_NUMBER);
       // collect status and process
       status = this.readStatus(storeKey);
       
@@ -1642,6 +1663,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
         storeKey = storeKeys ? storeKeys[idx] : undefined ;
       }
       if(storeKey) {
+        sc_precondition(typeof storeKey === SC.T_NUMBER);
         status = this.readStatus(storeKey);
         
         if ((status == K.EMPTY) || (status == K.ERROR)) {
@@ -1731,6 +1753,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
       }
       id = (ids) ? ids.objectAt(idx) : dataHash[primaryKey];
       ret[idx] = storeKey = recordType.storeKeyFor(id); // needed to cache
+      sc_precondition(typeof storeKey === SC.T_NUMBER);
       
       if (this.readStatus(storeKey) & K.BUSY) {
         this.dataSourceDidComplete(storeKey, dataHash, id);
@@ -1778,6 +1801,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {SC.Store} reciever
   */
   dataSourceDidCancel: function(storeKey) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var status = this.readStatus(storeKey), 
         K      = SC.Record;
     
@@ -1834,6 +1858,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {SC.Store} reciever
   */
   dataSourceDidComplete: function(storeKey, dataHash, newId) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var status = this.readStatus(storeKey), K = SC.Record, statusOnly;
     
     // EMPTY, ERROR, READY_CLEAN, READY_NEW, READY_DIRTY, DESTROYED_CLEAN,
@@ -1865,6 +1890,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {SC.Store} reciever
   */
   dataSourceDidDestroy: function(storeKey) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var status = this.readStatus(storeKey), K = SC.Record;
     
     // EMPTY, ERROR, READY_CLEAN, READY_NEW, READY_DIRTY, DESTROYED_CLEAN,
@@ -1890,6 +1916,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {SC.Store} reciever
   */
   dataSourceDidError: function(storeKey, error) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var status = this.readStatus(storeKey), errors = this.recordErrors, K = SC.Record;
     
     // EMPTY, ERROR, READY_CLEAN, READY_NEW, READY_DIRTY, DESTROYED_CLEAN,
@@ -1929,6 +1956,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     var K = SC.Record, status;
     
     if(storeKey===undefined) storeKey = recordType.storeKeyFor(id);
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     status = this.readStatus(storeKey);
     if(status==K.EMPTY || status==K.ERROR || status==K.READY_CLEAN || status==K.DESTROYED_CLEAN || status==K.BUSY_LOADING) {
       
@@ -1959,6 +1987,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     if(storeKey===undefined){
       storeKey = recordType.storeKeyFor(id);
     }
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     status = this.readStatus(storeKey);
     if(status==K.EMPTY || status==K.ERROR || status==K.READY_CLEAN || status==K.DESTROY_CLEAN){
       status = K.DESTROY_CLEAN;
@@ -1984,6 +2013,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     var K = SC.Record, status, errors = this.recordErrors;
     
     if(storeKey===undefined) storeKey = recordType.storeKeyFor(id);
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     status = this.readStatus(storeKey);
     
     if(status==K.EMPTY || status==K.ERROR || status==K.READY_CLEAN || status==K.DESTROY_CLEAN){
@@ -2264,6 +2294,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @returns {String}
   */
   statusString: function(storeKey) {
+    sc_precondition(typeof storeKey === SC.T_NUMBER);
     var rec = this.materializeRecord(storeKey);
     return rec.statusString();
   },

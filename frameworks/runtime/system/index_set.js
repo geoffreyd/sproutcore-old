@@ -438,7 +438,10 @@ SC.IndexSet = SC.mixin({},
         start = start.start;
       }
     } else if (length === null) length = 1 ;
-
+    
+    sc_precondition(typeof start === SC.T_NUMBER);  // Make sure we have the
+    sc_precondition(typeof length === SC.T_NUMBER); // Correct data.
+    
     // if no length - do nothing.
     if (length <= 0) return this;
     
