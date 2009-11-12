@@ -103,6 +103,20 @@ SC.RecordAttribute = SC.Object.extend(
   */
   useIsoDate: YES,
   
+  /**
+    Can only be used for toOne or toMany relationship attributes. If YES,
+    this flag will ensure that any related objects will also be marked
+    dirty when this record dirtied. 
+    
+    Useful when you might have multiple related objects that you want to 
+    consider in an 'aggregated' state. For instance, by changing a child
+    object (image) you might also want to automatically mark the parent 
+    (album) dirty as well.
+    
+    @property {Boolean}
+  */
+  aggregate: NO,
+  
   // ..........................................................
   // HELPER PROPERTIES
   // 

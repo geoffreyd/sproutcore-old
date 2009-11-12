@@ -334,12 +334,13 @@ SC.Request = SC.Object.extend(SC.Copyable, SC.Freezable,
     Your notification callback should expect to receive the Response object
     as the first parameter plus any additional parameters that you pass.  
     
+    @param {Number} status
     @param {Object} target
     @param {String|function} action
     @param {Hash} params
     @returns {SC.Request} receiver
   */
-  notify: function(status, target, action) {
+  notify: function(status, target, action, params) {
     
     // normalize status
     var hasStatus = YES, params ;
@@ -369,7 +370,7 @@ SC.Request.mixin(/** @scope SC.Request */ {
     @returns {SC.Request} receiver
   */
   getUrl: function(address) {
-    return SC.Request.create().set('address', address).set('type', 'GET');
+    return this.create().set('address', address).set('type', 'GET');
   },
 
   /**
@@ -380,7 +381,7 @@ SC.Request.mixin(/** @scope SC.Request */ {
     @returns {SC.Request} receiver
   */
   postUrl: function(address, body) {
-    var req = SC.Request.create().set('address', address).set('type', 'POST');
+    var req = this.create().set('address', address).set('type', 'POST');
     if(body) req.set('body', body) ;
     return req ;
   },
@@ -392,7 +393,7 @@ SC.Request.mixin(/** @scope SC.Request */ {
     @returns {SC.Request} receiver
   */
   deleteUrl: function(address) {
-    return SC.Request.create().set('address', address).set('type', 'DELETE');
+    return this.create().set('address', address).set('type', 'DELETE');
   },
 
   /**
@@ -403,7 +404,7 @@ SC.Request.mixin(/** @scope SC.Request */ {
     @returns {SC.Request} receiver
   */
   putUrl: function(address, body) {
-    var req = SC.Request.create().set('address', address).set('type', 'PUT');
+    var req = this.create().set('address', address).set('type', 'PUT');
     if(body) req.set('body', body) ;
     return req ;
   }

@@ -213,7 +213,6 @@ div#show-tests * { display: none; }\
 	<b id="floatTest">Float test.</b>\
 	<iframe id="iframe" name="iframe"></iframe>\
 	<form id="lengthtest">\
-		<input type="text" id="length" name="test"/>\
 		<input type="text" id="idTest" name="id"/>\
 	</form>\
 	<table id="table"></table>\
@@ -663,7 +662,7 @@ test("width()", function() {
  // IE is off by one on this.  We don't really care at this point since ems 
  // is not really central to most SC apps.
  $div.css("padding", "2em");
- var e = SC.browser.msie ? 29 : 30; 
+ var e = SC.browser.msie==8 ? 29 : 30; 
  equals($div.width(), e, "Test padding specified with ems");
 
  $div.css("border", "1em solid #fff");
@@ -697,7 +696,7 @@ test("height()", function() {
  // IE is off by one on this.  We don't really care at this point since ems 
  // is not really central to most SC apps.
  $div.css("padding", "2em");
- var e = SC.browser.msie ? 29 : 30; 
+ var e = SC.browser.msie==8 ? 29 : 30; 
  equals($div.height(), e, "Test padding specified with ems");
 
  $div.css("border", "1em solid #fff");

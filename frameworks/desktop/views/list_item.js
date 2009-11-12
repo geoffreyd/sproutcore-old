@@ -166,7 +166,7 @@ SC.ListItemView = SC.View.extend(
   */
   contentIsEditable: function() {
     var content = this.get('content');
-    return content && (content.get('isEditable')!==NO);
+    return content && (content.get ? content.get('isEditable')!==NO : NO);
   }.property('content').cacheable(),
   
   /**
@@ -192,7 +192,7 @@ SC.ListItemView = SC.View.extend(
     // outline level wrapper
     working = context.begin("div").addClass("sc-outline");
     if (level>=0 && indent>0) working.addStyle("left", indent*(level+1));
-    
+
     // handle disclosure triangle
     value = this.get('disclosureState');
     hideDisclosure = (content ? (content.get ? content.get('hideDisclosure') : content['hideDisclosure']) : NO ) ;

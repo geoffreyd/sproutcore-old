@@ -34,10 +34,11 @@ SC.CheckboxView = SC.FieldView.extend(SC.StaticLayout, SC.Button,
     if (firstTime) {
       dt = this._field_currentDisplayTitle = this.get('displayTitle');
 
-      var blank = sc_static('blank');
+      var blank = SC.BLANK_IMAGE_URL;
       var disabled = this.get('isEnabled') ? '' : 'disabled="disabled"';
+      if(SC.browser.msie) context.attr('for', SC.guidFor(this));
       context.push('<span class="button" ></span>');
-      context.push('<input type="checkbox" name="%@" %@ />'.fmt(SC.guidFor(this),disabled));
+      context.push('<input type="checkbox" id="%@" name="%@" %@ />'.fmt(SC.guidFor(this),SC.guidFor(this),disabled));
       if(this.get('needsEllipsis')){
         context.push('<span class="label ellipsis">', dt, '</span>');
       }else{
@@ -118,7 +119,7 @@ SC.CheckboxView = SC.FieldView.extend(SC.StaticLayout, SC.Button,
     SC.Event.remove(this.$input()[0], 'click', this, this._field_fieldValueDidChange); 
   },
   
-  mouseDown: function(evt) {  
+  mouseDown: function(evt) {
     this.set('isActive', YES);
     this._field_isMouseDown = YES;
     return YES;

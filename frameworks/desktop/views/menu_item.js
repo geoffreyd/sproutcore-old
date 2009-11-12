@@ -266,7 +266,7 @@ SC.MenuItemView = SC.ButtonView.extend( SC.ContentDisplay,
       className = '' ;
     } else {
       className = image ;
-      url = sc_static('blank.gif') ; 
+      url = SC.BLANK_IMAGE_URL; 
     }
     // generate the img element...
     context.begin('img').addClass('image').addClass(className).attr('src', url).end() ;
@@ -282,7 +282,7 @@ SC.MenuItemView = SC.ButtonView.extend( SC.ContentDisplay,
   */
 
   renderLabel: function(context, label) {
-    context.push("<span class='value'>"+label+"</span>") ;
+    context.push("<span class='value ellipsis'>"+label+"</span>") ;
   },
   
   /** 
@@ -297,7 +297,7 @@ SC.MenuItemView = SC.ButtonView.extend( SC.ContentDisplay,
   renderBranch: function(context, hasBranch) {
 
     var a = '>' ;
-    var url = sc_static('blank.gif') ;
+    var url = SC.BLANK_IMAGE_URL;
     context.push('<span class= "hasBranch">'+a+'</span>') ; 
   },
 

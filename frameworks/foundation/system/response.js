@@ -113,7 +113,9 @@ SC.Response = SC.Object.extend(
   }.property('request').cacheable(),
   
   /**
-    The response status code.  
+    The response status code.
+    
+    @property {Number}
   */
   status: -100, // READY
 
@@ -133,14 +135,24 @@ SC.Response = SC.Object.extend(
   encodedBody: null,
   
   /**
-    Response body.  If isJSON was set, will be parsed automatically.
+    Response body. If isJSON was set, will be parsed automatically.
     
-    @property {Hash|String}
+    @response {Hash|String|SC.Error} the response body or the parsed JSON.
+      Returns a SC.Error instance if there is a JSON parsing error.
   */
   body: function() {
     // TODO: support XML
     var ret = this.get('encodedBody');
-    if (ret && this.get('isJSON')) ret = SC.json.decode(ret);
+    if (ret && this.get('isJSON')) {
+      try {
+        ret = SC.json.decode(ret);
+      } catch(e) {
+        return SC.Error.create({
+          message: e.name + ': ' + e.message,
+          label: 'Response',
+          errorValue: this });
+      }
+    }
     return ret;
   }.property('encodedBody').cacheable(),
   
@@ -251,6 +263,10 @@ SC.Response = SC.Object.extend(
   */
   cancelTransport: function() {},
   
+  
+  /** @private
+    Will notify each listener.
+  */
   _notifyListener: function(listeners, status) {
     var info = listeners[status], params, target, action;
     if (!info) return NO ;
@@ -287,6 +303,9 @@ SC.Response = SC.Object.extend(
     return this ;
   },
   
+  /**
+    String representation of the response object
+  */
   toString: function() {
     var ret = sc_super();
     return "%@<%@ %@, status=%@".fmt(ret, this.get('type'), this.get('address'), this.get('status'));
@@ -385,7 +404,7 @@ SC.XHRResponse = SC.Response.extend({
         handleReadyStateChange = function() {
           if (!transport) return null ;
           var ret = transport.finishRequest();
-          transport = null ; // cleanup memory
+          if (ret) transport = null ; // cleanup memory
           return ret ;
         };
         rawRequest.onreadystatechange = handleReadyStateChange;
@@ -445,12 +464,11 @@ SC.XHRResponse = SC.Response.extend({
         this.set('status', status);
       
       }, this);
-    }
-     
-    if (readyState === 4) {
       // avoid memory leak in MSIE: clean up
       rawRequest.onreadystatechange = function() {} ;
+      return YES;
     }
+    return NO; 
   }
 
   

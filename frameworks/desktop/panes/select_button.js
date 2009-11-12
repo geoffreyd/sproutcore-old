@@ -263,11 +263,11 @@ SC.SelectButtonView = SC.ButtonView.extend(
     @default YES
   */
   needsEllipsis: YES,
-  
+
   /**
-    This property allows you at add extra padding to the height 
+    This property allows you at add extra padding to the height
     of the menu pane.
-    
+
     @default 0
     @property {Number} heightPadding for menu pane.
   */
@@ -403,6 +403,7 @@ SC.SelectButtonView = SC.ButtonView.extend(
 
       //Set the items in the itemList array
       itemList.push(item);
+
     }
 
     idx += 1 ;
@@ -441,18 +442,43 @@ SC.SelectButtonView = SC.ButtonView.extend(
   _action: function( evt )
   {
     var buttonLabel = this.$('.sc-button-label')[0] ;
-    var menuWidth = this.get('layer').offsetWidth ; // Get the length of the text on the button in pixels
+    // Get the length of the text on the button in pixels
+    var menuWidth = this.get('layer').offsetWidth ;
     var scrollWidth = buttonLabel.scrollWidth ;
     var lastMenuWidth = this.get('lastMenuWidth') ;
     if(scrollWidth) {
-       var offsetWidth = buttonLabel.offsetWidth ; // Get the original width of the label in the button
+       // Get the original width of the label in the button
+       var offsetWidth = buttonLabel.offsetWidth ;
        if(scrollWidth && offsetWidth) {
-          menuWidth = menuWidth + scrollWidth - offsetWidth ; //Add the difference of the offset Height and the scrollHeight to the menu width
+          menuWidth = menuWidth + scrollWidth - offsetWidth ;
        }
     }
     if (!lastMenuWidth || (menuWidth > lastMenuWidth)) {
       lastMenuWidth = menuWidth ;
     }
+
+    var items = this.get('itemList') ;
+    var elementOffsetWidth, largestMenuWidth ;
+
+    for (var idx = 0; idx < items.length; ++idx) {
+      //getting the width of largest menu item
+      var item = items.objectAt(idx) ;
+      var element = document.createElement('div') ;
+      element.style.cssText = 'top:-10000px; left: -10000px;  position: absolute;' ;
+      element.className = 'sc-view sc-pane sc-panel sc-palette sc-picker sc-menu select-button sc-scroll-view sc-menu-scroll-view sc-container-view menuContainer sc-button-view sc-menu-item sc-regular-size' ;
+      element.innerHTML = item.title ;
+      document.body.appendChild(element) ;
+      elementOffsetWidth = element.offsetWidth ;
+
+      if (!largestMenuWidth || (elementOffsetWidth > largestMenuWidth)) {
+        largestMenuWidth = elementOffsetWidth ;
+      }
+      document.body.removeChild(element) ;
+    }
+
+    lastMenuWidth = (largestMenuWidth > lastMenuWidth) ?
+                      largestMenuWidth: lastMenuWidth ;
+
     this.set('lastMenuWidth',lastMenuWidth) ;
     var currSel = this.get('currentSelItem') ;
     var itemList = this.get('itemList') ;
@@ -491,7 +517,7 @@ SC.SelectButtonView = SC.ButtonView.extend(
         @property
       */
       isEnabled: YES,
-      
+
       menuHeightPadding: menuHeightPadding,
 
       preferType: SC.PICKER_MENU,

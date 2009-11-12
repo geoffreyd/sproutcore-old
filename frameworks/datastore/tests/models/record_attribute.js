@@ -15,6 +15,9 @@ module("SC.RecordAttribute core methods", {
       store: SC.Store.create()
     });
     
+    // stick it to the window object so that objectForPropertyPath works
+    window.MyApp = MyApp;
+    
     MyApp.Foo = SC.Record.extend({
       
       // test simple reading of a pass-through prop
@@ -57,7 +60,10 @@ module("SC.RecordAttribute core methods", {
       
     });
     
-    MyApp.Bar = SC.Record.extend({});
+    MyApp.Bar = SC.Record.extend({
+      parent: SC.Record.toOne('MyApp.Foo', { aggregate: YES }),
+      relatedMany: SC.Record.toMany('MyApp.Foo', { aggregate: YES })
+    });
     
     SC.RunLoop.begin();
     storeKeys = MyApp.store.loadRecords(MyApp.Foo, [
@@ -75,6 +81,7 @@ module("SC.RecordAttribute core methods", {
         firstName: "Jane", 
         lastName: "Doe", 
         relatedTo: 'foo1',
+        relatedToAggregate: 'bar1',
         anArray: 'notAnArray',
         anObject: 'notAnObject',
         nonIsoDate: "2009/06/10 8:55:50 +0000"
@@ -92,7 +99,7 @@ module("SC.RecordAttribute core methods", {
     ]);
     
     MyApp.store.loadRecords(MyApp.Bar, [
-      { guid: 'bar1', city: "Chicago" }
+      { guid: 'bar1', city: "Chicago", parent: 'foo2', relatedMany: ['foo1', 'foo2'] }
     ]);
     
     SC.RunLoop.end();
@@ -165,7 +172,6 @@ test("writing pass-through should simply set value", function() {
 });
 
 test("writing a value should override default value", function() {
-
   equals(rec.get('defaultValue'), 'default', 'precond - returns default');
   rec.set('defaultValue', 'not-default');
   equals(rec.get('defaultValue'), 'not-default', 'newly written value should replace default value');
@@ -175,4 +181,23 @@ test("writing a date should generate an ISO date" ,function() {
   var date = new Date(1238650083966);
   equals(rec.set('date', date), rec, 'returns reciever');
   equals(rec.readAttribute('date'), '2009-04-01T22:28:03-07:00', 'should have new time (%@)'.fmt(date.toString()));
+});
+
+test("writing an attribute should make relationship aggregate dirty" ,function() {
+  equals(bar.get('status'), SC.Record.READY_CLEAN, "precond - bar should be READY_CLEAN");
+  equals(rec2.get('status'), SC.Record.READY_CLEAN, "precond - rec2 should be READY_CLEAN");
+  
+  bar.set('city', 'Oslo');
+  
+  equals(rec2.get('status'), SC.Record.READY_DIRTY, "foo2 should be READY_DIRTY");
+});
+
+test("writing an attribute should make many relationship aggregate dirty" ,function() {
+  equals(bar.get('status'), SC.Record.READY_CLEAN, "precond - bar should be READY_CLEAN");
+  equals(rec2.get('status'), SC.Record.READY_CLEAN, "precond - rec2 should be READY_CLEAN");
+  
+  bar.set('city', 'Oslo');
+  
+  equals(rec.get('status'), SC.Record.READY_DIRTY, "foo1 should be READY_DIRTY");
+  equals(rec2.get('status'), SC.Record.READY_DIRTY, "foo2 should be READY_DIRTY");
 });
