@@ -346,7 +346,7 @@ SC.ScrollView = SC.View.extend(SC.Border, {
     var origX = vo.x, origY = vo.y;
     
     // add in offset of container
-    layer = this.get('containerView').get('layer');
+    var layer = this.get('containerView').get('layer');
     cf = SC.viewportOffset(layer);
     
     vo.x += cf.x ;
