@@ -58,6 +58,8 @@ SC.DRAG_AUTOSCROLL_ZONE_THICKNESS = 20;
   @extends SC.Object
 */
 SC.Drag = SC.Object.extend(
+  SC.DelegateSupport,
+  SC.DragDelegate,
 /** @scope SC.Drag.prototype */ {
   
   /**
@@ -143,6 +145,22 @@ SC.Drag = SC.Object.extend(
     @type Point
   */
   location: {},
+  
+  // ..........................................
+  // DELEGATE SUPPORT
+  //
+  
+  /**
+    Delegate used to implement fine-grained control over Drag behaviors.
+    
+    You can assign a delegate object to this property that will be consulted
+    for various decisions regarding drag and drop, and ghost rendering.  
+    The object you place here must implement some or all of the 
+    SC.DragDelegate mixin. 
+    
+    @type {SC.DragDelegate}
+  */
+  delegate: null,
   
   // ..........................................
   // DRAG DATA
@@ -270,6 +288,14 @@ SC.Drag = SC.Object.extend(
   */
   allowedDragOperations: SC.DRAG_ANY,
   
+  /**
+    The view that was last dragged over
+    
+    @readOnly
+    @type SC.View
+  */
+  lastTarget: null,
+  
   /** @private required by autoscroll */
   _dragInProgress: YES,
   
@@ -278,7 +304,11 @@ SC.Drag = SC.Object.extend(
   */
   startDrag: function() {
     // create the ghost view
-    this._createGhostView() ;
+    if (delegate && delegate.createGhostView) {
+      delegate.createGhostView(this);
+    } else {
+      this._createGhostView();
+    }
     
     var evt = this.event ;
     
@@ -351,7 +381,7 @@ SC.Drag = SC.Object.extend(
     // differs from the deepest target found, then go up the chain until we 
     // either hit the last one or find one that will allow a drag operation
     var source = this.source ;
-    var last = this._lastTarget ;
+    var last = this.lastTarget ;
     var target = this._findDropTarget(evt) ; // deepest drop target
     var op = SC.DRAG_NONE ;
     
@@ -382,13 +412,18 @@ SC.Drag = SC.Object.extend(
         if (target.dragUpdated) target.dragUpdated(this, evt) ;
       }
       
-      this._lastTarget = target ;
+      this.lastTarget = target ;
     } else {
       if (target && target.dragUpdated) target.dragUpdated(this, evt) ;
     }
      
     // notify source that the drag moved
     if (source && source.dragDidMove) source.dragDidMove(this, loc) ;
+    
+    // Give chance for delegate to change ghostView
+    if(!this._ghostViewHidden && delegate && delegate.updateGhostViewForDrag){
+      delegate.updateGhostViewForDrag(this);
+    }
     
     // reposition the ghostView
     if(!this._ghostViewHidden) this._positionGhostView(evt) ;
@@ -402,7 +437,7 @@ SC.Drag = SC.Object.extend(
   */
   mouseUp: function(evt) {
     var loc    = { x: evt.pageX, y: evt.pageY },
-        target = this._lastTarget, 
+        target = this.lastTarget, 
         op     = this.allowedDragOperations;
     
     this.set('location', loc);
@@ -442,7 +477,7 @@ SC.Drag = SC.Object.extend(
     var source = this.source ;
     if (source && source.dragDidEnd) source.dragDidEnd(this, loc, op) ;
     
-    this._lastTarget = null ;
+    this.lastTarget = null ;
     this._dragInProgress = NO ; // required by autoscroll (invoked by a timer)
   },
   
@@ -509,7 +544,11 @@ SC.Drag = SC.Object.extend(
   unhideGhostView: function() {
     if(this._ghostViewHidden) {
       this._ghostViewHidden = NO;
-      this._createGhostView();
+      if (delegate && delegate.createGhostView) {
+        delegate.createGhostView(this);
+      } else {
+        this._createGhostView();
+      }
     }
   },
   
