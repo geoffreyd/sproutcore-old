@@ -11,28 +11,12 @@ SC.DragDelegate = {
   */
   isDragDelegate: YES,
   
-  updateGhostViewForDrag(drag) {
+  updateGhostViewForDrag: function(drag) {
     
   },
   
-  createGhostView(drag) {
-    var that  = drag,
-        frame = drag.dragView.get('frame'),
-        view;
-        
-    view = drag.ghostView = SC.Pane.create({
-      classNames:['sc-ghost-view'],
-      layout: { top: frame.y, left: frame.x, width: frame.width, height: frame.height },
-      owner: drag,
-      didCreateLayer: function() {
-        if (that.dragView) {
-          var layer = that.dragView.get('layer') ;
-          if (layer) this.get('layer').appendChild(layer.cloneNode(true)) ;
-        }
-      }
-    });
-    
-    view.append() ;  // add to window
+  createGhostView: function(drag) {
+    return null;
   }
   
 }

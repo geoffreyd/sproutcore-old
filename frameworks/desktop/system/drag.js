@@ -4,6 +4,8 @@
 // Portions copyright ©2008 Apple Inc.  All rights reserved.
 // ========================================================================
 
+sc_require('mixins/drag_delegate') ;
+
 SC.DRAG_LINK = 0x0004; SC.DRAG_COPY = 0x0001; SC.DRAG_MOVE = 0x0002;
 SC.DRAG_NONE = 0x0000; SC.DRAG_ANY = 0x0007; // includes SC.DRAG_REORDER
 SC.DRAG_AUTOSCROLL_ZONE_THICKNESS = 20;
@@ -304,11 +306,7 @@ SC.Drag = SC.Object.extend(
   */
   startDrag: function() {
     // create the ghost view
-    if (delegate && delegate.createGhostView) {
-      delegate.createGhostView(this);
-    } else {
-      this._createGhostView();
-    }
+    this.invokeDelegateMethod(this.delegate, 'createGhostView', this) !== null || this.createGhostView();
     
     var evt = this.event ;
     
@@ -421,9 +419,7 @@ SC.Drag = SC.Object.extend(
     if (source && source.dragDidMove) source.dragDidMove(this, loc) ;
     
     // Give chance for delegate to change ghostView
-    if(!this._ghostViewHidden && delegate && delegate.updateGhostViewForDrag){
-      delegate.updateGhostViewForDrag(this);
-    }
+    this.invokeDelegateMethod(this.delegate, 'updateGhostViewForDrag', this);
     
     // reposition the ghostView
     if(!this._ghostViewHidden) this._positionGhostView(evt) ;
@@ -484,7 +480,7 @@ SC.Drag = SC.Object.extend(
   /** @private
     This will create the ghostView and add it to the document.
   */
-  _createGhostView: function() {
+  createGhostView: function() {
     var that  = this,
         frame = this.dragView.get('frame'),
         view;
@@ -544,11 +540,7 @@ SC.Drag = SC.Object.extend(
   unhideGhostView: function() {
     if(this._ghostViewHidden) {
       this._ghostViewHidden = NO;
-      if (delegate && delegate.createGhostView) {
-        delegate.createGhostView(this);
-      } else {
-        this._createGhostView();
-      }
+      this.invokeDelegateMethod(this.delegate, 'createGhostView', this) !== null || this.createGhostView();
     }
   },
   

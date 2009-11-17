@@ -579,6 +579,11 @@ SC.CollectionView = SC.View.extend(
     return this.delegateFor('isCollectionContent', del, content);
   }.property('delegate', 'content').cacheable(),
   
+  /**
+    Drag Delegate used to have custom ghostViews
+  */
+  dragDelegate: null,
+  
   // ..........................................................
   // CONTENT CHANGES
   // 
@@ -2258,6 +2263,7 @@ SC.CollectionView = SC.View.extend(
         // Initiate the drag
         SC.Drag.start({
           event: info.event,
+          delegate: this.get('dragDelegate'),
           source: this,
           dragView: dragView,
           ghost: NO,

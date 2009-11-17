@@ -406,7 +406,7 @@ SC.ListView = SC.CollectionView.extend(
   },
   
   // ..........................................................
-  // DRAG AND ROP SUPPORT
+  // DRAG AND DROP SUPPORT
   // 
   
   
