@@ -808,7 +808,7 @@ SC.CollectionView = SC.View.extend(
         nowShowing = this.get('nowShowing'),
         itemViews  = this._sc_itemViews,
         containerView = this.get('containerView') || this,
-        views, idx, cvlen, view, childViews, layer ;
+        views, idx, view, layer ;
 
     // if the set is defined but it contains the entire nowShowing range, just
     // replace
@@ -817,15 +817,12 @@ SC.CollectionView = SC.View.extend(
 
     // if an index set, just update indexes
     if (invalid.isIndexSet) {
-      childViews = containerView.get('childViews');
-      cvlen = childViews.get('length');
       
       if (bench) {
         SC.Benchmark.start(bench="%@#reloadIfNeeded (Partial)".fmt(this),YES);
       }
       
       invalid.forEach(function(idx) {
-        
         // get the existing item view, if there is one
         var existing = itemViews ? itemViews[idx] : null;
         
@@ -909,7 +906,7 @@ SC.CollectionView = SC.View.extend(
     child views still need to be added, go ahead and add them.
   */
   render: function(context, firstTime) {
-    if (firstTime && this._needsReload) this.reloadIfNeeded ;
+    if (firstTime && this._needsReload) this.reloadIfNeeded() ;
     
     // add classes for other state.
     context.setClass('focus', this.get('isFirstResponder'));

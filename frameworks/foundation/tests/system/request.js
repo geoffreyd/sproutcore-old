@@ -27,11 +27,11 @@ test("Basic Requirements", function() {
 });
 
 test("Test Asynchronous GET Request", function() {
-
+  
   var response, timer;
 
   timer = setTimeout(function() {
-    ok(false, 'response did not invoke notify() withint 2sec');
+    ok(false, 'response did not invoke notify() within 2sec');
     window.start();
   }, 2000);
   
@@ -155,7 +155,69 @@ test("Test Multiple Asynchronous GET Request - two immediate, and two in serial"
   setTimeout( function(){
     equals(requestCount, 6, "requestCount should be 6");
     equals(responseCount, 6, "responseCount should be 6");
-    window.start() ; // starts the test runne
+    window.start() ; // starts the test runner
   }, 2000);
+});
+
+
+test("Test timeouts", function() {
+  var message;
+  
+  // Sanity check 1
+  try {
+    SC.Request.getUrl(url).set('timeout', 0).send();
+  }
+  catch (e) {
+    message = e;
+  }
+  ok(message && message.indexOf("The timeout value must either not be specified or must be greater than 0") !== -1, 'An error should be thrown when the timeout value is 0 ms');
+  
+  // Sanity check 2
+  try {
+    SC.Request.getUrl(url).set('isAsynchronous', NO).set('timeout', 10).send();
+  }
+  catch (e2) {
+    message = e2;
+  }
+  ok(message && message.indexOf("Timeout values cannot be used with synchronous requests") !== -1, 'An error should be thrown when trying to use a timeout with a synchronous request');
+
+
+  // Make sure timeouts actually fire, and fire when expected.
+  var changedBefore  = NO,
+      changedAfter   = NO,
+      timeoutRequest = SC.Request.getUrl("http://www.sproutcore.com"),
+      checkstop;
+
+  var now = Date.now();
+  
+  // make the timeout as short as possible so that it will always happen
+  timeoutRequest.set('timeout', 10);
+  timeoutRequest.set('didTimeout', function() { 
+    // at least timeout time must have elapsed
+    var elapsed = Date.now()-now;
+    ok(elapsed >= 10, 'timeout must not fire earlier than 10msec - actual %@'.fmt(elapsed));
+
+    // timeout did fire...just resume...
+    clearTimeout(checkstop);
+    window.start();
+  });
+  
+  timeoutRequest.set('didReceive', function() { 
+    ok(false, 'timeout did not fire before response was recieved.  should have fired after 10msec.  response time: %@msec'.fmt(Date.now() - now));
+    window.start(); // resume
+  });
+  
+  SC.RunLoop.begin();
+  timeoutRequest.send();
+  SC.RunLoop.end();
+  
+  stop() ; // stops the test runner
+
+  // in case nothing works
+  checkstop = setTimeout(function() {
+    ok(false, 'timeout did not fire at all');
+    window.start();
+  }, 500); 
+  
 });
 

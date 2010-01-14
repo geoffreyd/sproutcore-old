@@ -13,6 +13,7 @@ function testConsole() {
   return {
     log: function() { return true; },
     alert: function() { return true; },
+    debug: function() { return true; },
     dir: function() { return true; },
     dirxml: function() { return true; },
     error: function() { return true; },
@@ -26,12 +27,13 @@ function testConsole() {
     trace: function() { return true; },
     warn: function() { return true; }
   };
-};
+}
 
 module("SC.Logger", {
   setup: function() {
     SC.Logger.set('reporter', testConsole());
     
+    SC.Logger.debugEnabled = true;
     SC.Logger.format = true;
     SC.Logger.fallBackOnLog = true;
     SC.Logger.fallBackOnAlert = false;
@@ -56,6 +58,16 @@ test("log", function() {
   
   SC.Logger.fallBackOnAlert = true;
   equals(SC.Logger.log("test"), true, "Function is null -- fallBackOnAlert true");
+});
+
+test("debug", function() {
+  equals(SC.Logger.debug("Debug"), true, "Function is defined");
+
+  SC.Logger.get('reporter').debug = null;
+  equals(SC.Logger.debug("Debug"), true, "Function is null -- fallBackOnLog true");
+
+  SC.Logger.fallBackOnLog = false;
+  equals(SC.Logger.debug("Debug"), false, "Function is null -- fallBackOnLog false");
 });
 
 test("dir", function() {
