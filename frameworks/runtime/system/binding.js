@@ -438,7 +438,7 @@ SC.Binding = {
       
     // connection is completed, disconnect.
     } else {
-      SC.Observers.removeObserver(this._fromPropertyPath, this, this.fromPropertyDidChange, this._fromRoot) ;
+      SC.Observers.removeObserver(this._fromPropertyPath, this, this.fromPropertyDidChange, (this._fromRoot || this._toRoot)) ;
       if (!this._oneWay) {
         SC.Observers.removeObserver(this._toPropertyPath, this, this.toPropertyDidChange, this._toRoot) ;
       }
@@ -508,9 +508,8 @@ SC.Binding = {
     var source = this._bindingSource,
         key    = this._bindingKey,
         v, idx;
-        
-    if (!source) return ; // nothing to do
-    this._bindingValue = v = source.getPath(key);
+    
+    this._bindingValue = v = (source ? source.getPath(key) : null);
     
     // apply any transforms to get the to property value also
     var transforms = this._transforms;

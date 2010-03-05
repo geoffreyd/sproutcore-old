@@ -77,6 +77,8 @@ SC.SegmentedView = SC.View.extend(SC.Control,
   */
   localize: YES,
   
+  align: SC.ALIGN_CENTER,
+  
   /**
     Change the layout direction to make this a vertical set of tabs instead
     of horizontal ones.
@@ -272,6 +274,7 @@ SC.SegmentedView = SC.View.extend(SC.Control,
     if (firstTime || (items !== last)) {
       this._seg_displayItems = items; // save for future
       this.renderDisplayItems(context, items) ;
+      context.addStyle('text-align', this.get('align'));
     }else{
     // update selection and active state
       var activeIndex = this.get('activeIndex');
@@ -304,7 +307,8 @@ SC.SegmentedView = SC.View.extend(SC.Control,
         isArray     = SC.isArray(value),
         activeIndex = this.get('activeIndex'),
         len         = items.length,
-        title, icon, url, className, ic, item, toolTip, width, i;
+        title, icon, url, className, ic, item, toolTip, width, i, stylesHash,
+        classArray;
 
     for(i=0; i< len; i++){
       ic = context.begin('a').attr('href', 'javascript:;');
@@ -312,31 +316,40 @@ SC.SegmentedView = SC.View.extend(SC.Control,
       title = item[0]; 
       icon = item[3];
       toolTip = item[5];
-      ic.addStyle('display', 'inline-block');
-      ic.addClass('sc-segment');
+      
+      stylesHash = {};
+      classArray = [];
+
+      if (this.get('layoutDirection') == SC.LAYOUT_HORIZONTAL) {
+        stylesHash['display'] = 'inline-block' ;
+      }
+
+      classArray.push('sc-segment');
+      
       if(!item[2]){
-        ic.addClass('disabled');
+        classArray.push('disabled');
       }
       if(i===0){
-        ic.addClass('sc-first-segment');
+        classArray.push('sc-first-segment');
       }
       if(i===(len-1)){
-        ic.addClass('sc-last-segment');
+        classArray.push('sc-last-segment');
       }
       if(i!==0 && i!==(len-1)){
-        ic.addClass('sc-middle-segment');
+        classArray.push('sc-middle-segment');
       }      
       if( isArray ? (value.indexOf(item[1])>=0) : (item[1]===value)){
-        ic.addClass('sel');
+        classArray.push('sel');
       }
       if(activeIndex === i) {
-        ic.addClass('active') ;
+        classArray.push('active') ;
       }
       if(item[4]){
         width=item[4];
-        ic.addStyle('width', width+'px');
+        stylesHash['width'] = width+'px';
       }
-
+      ic.addClass(classArray);
+      ic.addStyle(stylesHash);
       if(toolTip) {
         ic.attr('title', toolTip) ;
       }

@@ -139,7 +139,7 @@ SC.SelectFieldView = SC.FieldView.extend(
         if (emptyName) {
           if (shouldLocalize) emptyName = emptyName.loc() ;
           if(firstTime){
-            context.push('<option value="***">%@</option>'.fmt(emptyName)) ;
+            context.push('<option value="***">'+emptyName+'</option>') ;
             context.push('<option disabled="disabled"></option>') ;
           }else{
             el=document.createElement('option');
@@ -172,7 +172,7 @@ SC.SelectFieldView = SC.FieldView.extend(
           // render HTML
           var disable = (this.validateMenuItem && this.validateMenuItem(value, name)) ? '' : 'disabled="disabled" ' ;
           if(firstTime){
-            context.push('<option %@value="%@">%@</option>'.fmt(disable,value,name)) ;
+            context.push('<option '+disable+'value="'+value+'">'+name+'</option>') ;
           } else{
             el=document.createElement('option');
             el.value=value;
@@ -298,6 +298,8 @@ SC.SelectFieldView = SC.FieldView.extend(
 
   didCreateLayer: function() {
     var input = this.$input();
+    if (this.get('isEnabled') == false)
+      this.$()[0].disabled = true;
     SC.Event.add(input, 'blur', this, this.fieldDidBlur);
     SC.Event.add(input, 'focus',this, this.fieldDidFocus);
     return sc_super();

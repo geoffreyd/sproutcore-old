@@ -168,6 +168,11 @@ SC.Pane = SC.View.extend( /** @scope SC.Pane.prototype */ {
     this.parentViewDidResize(); // start notifications.
     return this ;
   },
+
+  /** @private */
+  paneLayoutDidChange: function() {
+    this.invokeOnce(this.updateLayout);
+  }.observes('layout'),
   
   /**
     Attempts to send the event down the responder chain for this pane.  If you 
@@ -508,8 +513,13 @@ SC.Pane = SC.View.extend( /** @scope SC.Pane.prototype */ {
     @param {SC.RootResponder} rootResponder
     @returns {SC.Pane} receiver
   */
-  append: function() {
-    return this.appendTo(document.body) ;
+  append: function() {   
+    if(SC.userDefaults.get('ready')){
+      return this.appendTo(document.body) ;
+    } 
+    else {
+      SC.userDefaults.readyCallback(this, this.append);
+    }
   },
   
   /**

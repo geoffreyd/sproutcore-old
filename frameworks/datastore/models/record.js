@@ -183,7 +183,17 @@ SC.Record = SC.Object.extend(
     var store = this.get('store') ;
     return (store) ? store.readEditableDataHash(this.storeKey) : {} ;
   }.property(),
-    
+  
+  /**
+   * The child record cache.
+   */
+  childRecords: null,
+  
+  /**
+   * The namespace which to retrieve the childRecord Types from
+   */
+  childRecordNamespace: null,
+      
   // ...............................
   // CRUD OPERATIONS
   //
@@ -353,7 +363,7 @@ SC.Record = SC.Object.extend(
     if (!aggregates) {
       var dataHash = this.get('store').readDataHash(storeKey);
       aggregates = [];
-      for(k in dataHash) {
+      for(var k in dataHash) {
         if(this[k] && this[k].get && this[k].get('aggregate')===YES) {
           aggregates.push(k);
         }
@@ -439,25 +449,30 @@ SC.Record = SC.Object.extend(
   normalize: function(includeNull) {
     
     var primaryKey = this.primaryKey, 
-        dataHash   = {}, 
         recordId   = this.get('id'), 
         store      = this.get('store'), 
         storeKey   = this.get('storeKey'), 
-        recHash, attrValue, isRecord, defaultVal;
-    
+        recHash, attrValue, normChild,  isRecord, isChild, defaultVal;
+      
+    var dataHash = store.readEditableDataHash(storeKey) || {};
     dataHash[primaryKey] = recordId;
     
     for(var key in this) {
       // make sure property is a record attribute.
-      if(this[key] && this[key]['typeClass']) {
+      if(this[key] && this[key].typeClass) {
         
         isRecord = SC.typeOf(this[key].typeClass())==='class';
-
-        if (!isRecord) {
+        isChild = this[key].isChildRecordTransform;
+        if (!isRecord && !isChild) {
           attrValue = this.get(key);
+
           if(attrValue!==undefined || (attrValue===null && includeNull)) {
             dataHash[key] = attrValue;
           }
+        }
+        else if (isChild){
+          attrValue = this.get(key);
+          normChild = attrValue.normalize();
         }
         else if(isRecord) {
           recHash = store.readDataHash(storeKey);
@@ -482,10 +497,10 @@ SC.Record = SC.Object.extend(
         }
       }
     }
-    
-    store.writeDataHash(storeKey, dataHash);
+  
     return store.materializeRecord(storeKey);
   },
+  
   
   /**
     If you try to get/set a property not defined by the record, then this 
@@ -611,8 +626,75 @@ SC.Record = SC.Object.extend(
     }
     
     return ret.join(" ");
-  }
-      
+  },
+  
+  /**
+   * Registers a child record with this parent record.
+   *
+   * If the parent already knows about the child record, return the cached instance.  If not,
+   * create the child record instance and add it to the child record cache.
+   *
+   * @param {CoreOrion.ChildRecord} recordType The type of the child record to register.
+   * @param {Hash} hash The hash of attributes to apply to the child record.
+   */
+  registerChildRecord: function(recordType, hash) {
+    var pm = recordType.primaryKey || 'childRecordKey';
+    var childKey = hash[pm];
+    var childRecord = null;
+    var crManager = this.get('childRecords');
+    if (childKey && crManager) {
+      childRecord = crManager[childKey];
+    }
+
+    if (SC.none(childRecord)) childRecord = this.createChildRecord(recordType, hash);
+ 
+    return childRecord;
+  },
+  
+  /**
+   * Creates a new child record instance.
+   *
+   * @param {CoreOrion.ChildRecord} recordType The type of the child record to create.
+   * @param {Hash} hash The hash of attributes to apply to the child record. (may be null)
+   */
+  createChildRecord: function(childRecordType, hash) {
+    SC.RunLoop.begin();
+    // Generate the key used by the parent's child record manager.
+    var key = SC.Record._generateChildKey();
+    hash = hash || {}; // init if needed
+    var pm = childRecordType.primaryKey || 'childRecordKey';
+    var childKey = hash[pm];
+    hash[pm] = key;
+    
+    var store = this.get('store');
+    if (SC.none(store)) throw 'Error: during the creation of a child record: NO STORE ON PARENT!';
+    
+    var cr = store.createRecord(childRecordType, hash);
+    cr._parentRecord = this;
+    
+    // ID processing if necessary
+    if(this.generateIdForChild) this.generateIdForChild(cr);
+    
+    // Add the child record to the hash.
+    var crManager = this.get('childRecords');
+    if (SC.none(crManager)) {
+      //console.log('Creating Child Record Manager for (%@)'.fmt(SC.guidFor(this)));
+      crManager = SC.Object.create();
+      this.set('childRecords', crManager);
+    }
+    
+    crManager[key] = cr;
+    SC.RunLoop.end();
+    
+    return cr;
+  },
+  
+  /**
+   * Override this function if you want to have a special way of creating 
+   * ids for your child records
+   */
+  generateIdForChild: function(childRecord){}
+     
 }) ;
 
 // Class Methods
@@ -857,6 +939,11 @@ SC.Record.mixin( /** @scope SC.Record */ {
   */
   GENERIC_ERROR:       SC.$error("Generic Error"),
   
+  /**
+   * The next child key to allocate.  A nextChildKey must always be greater than 0.
+   */
+  _nextChildKey: 0,
+  
   // ..........................................................
   // CLASS METHODS
   // 
@@ -909,35 +996,63 @@ SC.Record.mixin( /** @scope SC.Record */ {
   },
   
   /**
-    Returns an SC.ManyAttribute that describes a record array backed by an 
-    array of guids stored in the underlying JSON.  You can edit the contents
-    of this relationship.
+    Returns:
     
-    If you set the inverse and isMaster: NO key, then editing this array will
-    modify the underlying data, but the inverse key on the matching record
-    will also be edited and that record will be marked as needing a change.
+    1: SC.ManyAttribute that describes a record array backed by an 
+    array of guids stored in the underlying JSON.  
+    2: SC.ChildrenAttribute that describes a record array backed by a
+    array of hashes.
+    
+    You can edit the contents of this relationship.
+    
+    For SC.ManyAttribute, If you set the inverse and isMaster: NO key, 
+    then editing this array will modify the underlying data, but the 
+    inverse key on the matching record will also be edited and that 
+    record will be marked as needing a change.
     
     @param {SC.Record|String} recordType The type of record to create
     @param {Hash} opts the options for the attribute
-    @returns {SC.ManyAttribute} created instance
+    @returns {SC.ManyAttribute|SC.ChildrenAttribute} created instance
   */
   toMany: function(recordType, opts) {
-    return SC.ManyAttribute.attr(recordType, opts);
+    opts = opts || {};
+    var isNested = opts.nested;
+    var attr;
+    if(isNested){
+      attr = SC.ChildrenAttribute.attr(recordType, opts);
+    }
+    else {
+      attr = SC.ManyAttribute.attr(recordType, opts);
+    }
+    return attr;
   },
   
   /**
-    Returns a SC.SingleAttribute that converts the underlying ID to a single
+    Returns:
+    1. SC.SingleAttribute that converts the underlying ID to a single
     record.  If you modify this property, it will rewrite the underyling ID. 
     It will also modify the inverse of the relationship, if you set it.
     
+    2. SC.ChildAttribute that you can edit the contents
+    of this relationship.
+    
     @param {SC.Record|String} recordType the type of the record to create
     @param {Hash} opts additional options
-    @returns {SC.SingleAttribute} created instance
+    @returns {SC.SingleAttribute|SC.ChildAttribute} created instance
   */
   toOne: function(recordType, opts) {
-    return SC.SingleAttribute.attr(recordType, opts);
+    opts = opts || {};
+    var isNested = opts.nested;
+    var attr;
+    if(isNested){
+      attr = SC.ChildAttribute.attr(recordType, opts);
+    }
+    else {
+      attr = SC.SingleAttribute.attr(recordType, opts);
+    }
+    return attr;
   },
-    
+  
   /**
     Returns all storeKeys mapped by Id for this record type.  This method is
     used mostly by the SC.Store and the Record to coordinate.  You will rarely
@@ -1008,6 +1123,15 @@ SC.Record.mixin( /** @scope SC.Record */ {
     var ret = SC.Object.extend.apply(this, arguments);
     SC.Query._scq_didDefineRecordType(ret);
     return ret ;
-  }
+  },
   
+  // ..........................................................
+  // PRIVATE METHODS
+  // 
+  
+  _generateChildKey: function() {
+    var newIdx = SC.Record._nextChildKey + 1;
+    SC.Record._nextChildKey = newIdx;
+    return newIdx; 
+  }
 });

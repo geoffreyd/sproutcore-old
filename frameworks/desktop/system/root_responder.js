@@ -158,7 +158,7 @@ SC.RootResponder = SC.RootResponder.extend(
   
   setup: function() {
     // handle basic events        
-    this.listenFor('keydown keyup mousedown mouseup click dblclick mouseout mouseover mousemove selectstart'.w(), document)
+    this.listenFor('keydown keyup mousedown mouseup click dblclick mouseout mouseover mousemove selectstart contextmenu'.w(), document)
         .listenFor('resize focus blur'.w(), window);
 
     // handle special case for keypress- you can't use normal listener to block the backspace key on Mozilla
@@ -205,6 +205,8 @@ SC.RootResponder = SC.RootResponder.extend(
     // do some initial set
     this.set('currentWindowSize', this.computeWindowSize()) ;
     this.focus(); // assume the window is focused when you load.
+    
+    sc_super();
   },
 
   /**
@@ -400,6 +402,14 @@ SC.RootResponder = SC.RootResponder.extend(
   keydown: function(evt) {
     if (SC.none(evt)) return YES;
     
+    // Fix for IME input (japanese, mandarin). 
+    // If the KeyCode is 229 wait for the keyup and
+    // trigger a keyDown if it is is enter onKeyup.
+    if (evt.keyCode===229){
+      this._IMEInputON = YES;
+      return YES;
+    }
+    
     // Firefox does NOT handle delete here...
     if (SC.browser.mozilla && (evt.which === 8)) return true ;
     
@@ -423,6 +433,7 @@ SC.RootResponder = SC.RootResponder.extend(
       
       // Arrow keys are handled in keypress for firefox
       if (evt.keyCode>=37 && evt.keyCode<=40 && SC.browser.mozilla) return YES;
+     
       
       ret = this.sendEvent('keyDown', evt) ;
       
@@ -473,6 +484,14 @@ SC.RootResponder = SC.RootResponder.extend(
     // send event for modifier key changes, but only stop processing if this is only a modifier change
     var ret = this._handleModifierChanges(evt);
     if (this._isModifierKey(evt)) return ret;
+    // Fix for IME input (japanese, mandarin). 
+    // If the KeyCode is 229 wait for the keyup and
+    // trigger a keyDown if it is is enter onKeyup.
+    if (this._IMEInputON && evt.keyCode===13){
+      evt.isIMEInput = YES;
+      this.sendEvent('keyDown', evt);
+      this._IMEInputON = NO;
+    } 
     return this.sendEvent('keyUp', evt) ? evt.hasCustomEventHandling:YES;
   },
   
@@ -484,25 +503,31 @@ SC.RootResponder = SC.RootResponder.extend(
       // the default action and we have something in the app like an iframe.
       window.focus();
       this.focus();
-      if(SC.browser.msie) {
-        this._lastMouseDownX = evt.clientX;
-        this._lastMouseDownY = evt.clientY;
-      }
-      // first, save the click count.  Click count resets if your down is
-      // more than 125msec after you last click up.
+
+      // First, save the click count. The click count resets if the mouse down
+      // event occurs more than 200 ms later than the mouse up event or more
+      // than 8 pixels away from the mouse down event.
       this._clickCount += 1 ;
       if (!this._lastMouseUpAt || ((Date.now()-this._lastMouseUpAt) > 200)) {
-        this._clickCount = 1 ; 
+        this._clickCount = 1 ;
+      } else {
+        var deltaX = this._lastMouseDownX - evt.clientX ;
+        var deltaY = this._lastMouseDownY - evt.clientY ;
+        var distance = Math.sqrt(deltaX*deltaX + deltaY*deltaY) ;
+        if (distance > 8.0) this._clickCount = 1 ;
       }
       evt.clickCount = this._clickCount ;
-      
+
+      this._lastMouseDownX = evt.clientX ;
+      this._lastMouseDownY = evt.clientY ;
+
       var fr, view = this.targetViewForEvent(evt) ;
       // InlineTextField needs to loose firstResponder whenever you click outside
       // the view. This is a special case as textfields are not supposed to loose 
       // focus unless you click on a list, another textfield or an special
       // view/control.
       
-      if(view) fr=view.get('pane').get('firstResponder');
+      if(view) fr=view.getPath('pane.firstResponder');
       
       if(fr && fr.kindOf(SC.InlineTextFieldView) && fr!==view){
         fr.resignFirstResponder();
@@ -693,10 +718,24 @@ SC.RootResponder = SC.RootResponder.extend(
   _mouseCanDrag: YES,
   
   selectstart: function(evt) { 
-    var result = this.sendEvent('selectStart', evt, this.targetViewForEvent(evt));
-    return (result !==null ? YES: NO) && (this._mouseCanDrag ? NO : YES);
+    var targetView = this.targetViewForEvent(evt);
+    var result = this.sendEvent('selectStart', evt, targetView);
+    
+    // If the target view implements mouseDragged, then we want to ignore the
+    // 'selectstart' event.
+    if (targetView && targetView.respondsTo('mouseDragged')) {
+      return (result !==null ? YES: NO) && !this._mouseCanDrag;
+    }
+    else {
+      return (result !==null ? YES: NO);
+    }
   },
   
-  drag: function() { return false; }
+  drag: function() { return false; },
+  
+  contextmenu: function(evt) {
+    var view = this.targetViewForEvent(evt) ; 
+    return this.sendEvent('contextMenu', evt, view);
+  }
   
 });

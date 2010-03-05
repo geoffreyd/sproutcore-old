@@ -1,7 +1,7 @@
 // ========================================================================
 // SC.Object bindings Tests
 // ========================================================================
-/*globals module test ok isObj equals expects */
+/*globals module test ok isObj equals expects TestNamespace */
 
 var testObject, fromObject, extraObject, TestObject;
 
@@ -30,10 +30,7 @@ module("bind() method", {
   },
   
   teardown: function() { 
-    delete testObject ; 
-    delete fromObject ;
-    delete extraObject ;
-  //  delete TestNamespace ;
+    testObject = fromObject = extraObject = null ; 
   }
   
 });
@@ -100,6 +97,13 @@ test("bind(*extraObject.foo) should create locally chained binding", function() 
   equals("extraObjectValue", testObject.get("foo"), "testObject.foo") ;
 });
 
+test("bind(*extraObject.foo) should be disconnectable", function() {
+  var binding = testObject.bind("foo", "*extraObject.foo");
+  SC.Binding.flushPendingChanges() ; // actually sets up up the binding
+  
+  binding.disconnect();
+  SC.Binding.flushPendingChanges() ;
+});
 
 module("fooBinding method", {
   
@@ -126,9 +130,7 @@ module("fooBinding method", {
   },
   
   teardown: function() { 
-    delete TestObject ;
-    delete fromObject ;
-    delete extraObject ;
+    TestObject = fromObject = extraObject = null ;
   //  delete TestNamespace ;
   }
   
@@ -229,8 +231,7 @@ module("fooBindingDefault: SC.Binding.Bool (old style)", {
   },
   
   teardown: function() { 
-    delete TestObject ;
-    delete fromObject ;
+    TestObject = fromObject = null ;
  //   delete TestNamespace ;
   }
   
@@ -296,8 +297,7 @@ module("fooBindingDefault: SC.Binding.bool() (new style)", {
   },
   
   teardown: function() { 
-    delete TestObject ;
-    delete fromObject ;
+    TestObject = fromObject = null ;
    // delete TestNamespace ;
   }
   
@@ -339,4 +339,22 @@ test("fooBinding: SC.Binding.not(TestNamespace.fromObject.bar should override de
   
   SC.Binding.flushPendingChanges();
   equals(YES, testObject.get("foo"), "testObject.foo == YES");
+});
+
+test("Chained binding should be null if intermediate object in chain is null", function() {
+  var a, z;
+  
+  a = SC.Object.create({
+    b: SC.Object.create({
+      c: 'c'
+    }),
+    zBinding: '*b.c'
+  });
+  
+  SC.Binding.flushPendingChanges();
+  equals(a.get('z'), 'c', "a.z == 'c'");
+    
+  a.set('b', null);
+  SC.Binding.flushPendingChanges();
+  equals(a.get('z'), null, "a.z == null");
 });

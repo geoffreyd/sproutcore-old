@@ -1162,6 +1162,81 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     return ret ;
   },
   
+  
+  /**
+    Unloads a record, removing the data hash from the store.  If you try to 
+    unload a record that is already destroyed then this method will have no effect.  
+    If you unload a record that does not exist or an error then an exception 
+    will be raised.
+    
+    @param {SC.Record} recordType the recordType
+    @param {String} id the record id
+    @param {Number} storeKey (optional) if passed, ignores recordType and id
+    @returns {SC.Store} receiver
+  */
+  unloadRecord: function(recordType, id, storeKey, newStatus) {
+    if (storeKey === undefined) storeKey = recordType.storeKeyFor(id);
+    var status = this.readStatus(storeKey), K = SC.Record;
+    newStatus = newStatus || K.EMPTY;
+    // handle status - ignore if destroying or destroyed
+    if ((status === K.BUSY_DESTROYING) || (status & K.DESTROYED)) {
+      return this; // nothing to do
+      
+    // error out if empty
+    } else if (status & K.BUSY) {
+      throw K.BUSY_ERROR ;
+           
+    // otherwise, destroy in dirty state
+    } else status = newStatus ;
+    
+    // remove the data hash, set new status
+    this.removeDataHash(storeKey, status);
+    this.dataHashDidChange(storeKey);
+            
+    return this ;
+  },
+  
+  /**
+    Unloads a group of records.  If you have a set of record ids, unloading
+    them this way can be faster than retrieving each record and unloading 
+    it individually.
+    
+    You can pass either a single recordType or an array of recordTypes.  If
+    you pass a single recordType, then the record type will be used for each
+    record.  If you pass an array, then each id must have a matching record 
+    type in the array.
+
+    You can optionally pass an array of storeKeys instead of the recordType
+    and ids.  In this case the first two parameters will be ignored.  This
+    is usually only used by low-level internal methods.  You will not usually
+    unload records this way.
+    
+    @param {SC.Record|Array} recordTypes class or array of classes
+    @param {Array} ids ids to unload
+    @param {Array} storeKeys (optional) store keys to unload
+    @returns {SC.Store} receiver
+  */
+  unloadRecords: function(recordTypes, ids, storeKeys, newStatus) {
+    var len, isArray, idx, id, recordType, storeKey;
+    if(storeKeys===undefined){
+      len = ids.length;
+      isArray = SC.typeOf(recordTypes) === SC.T_ARRAY;
+      if (!isArray) recordType = recordTypes;
+      for(idx=0;idx<len;idx++) {
+        if (isArray) recordType = recordTypes[idx] || SC.Record;
+        id = ids ? ids[idx] : undefined ;
+        this.unloadRecord(recordType, id, undefined, newStatus);
+      }
+    }else{
+      len = storeKeys.length;
+      for(idx=0;idx<len;idx++) {
+        storeKey = storeKeys ? storeKeys[idx] : undefined ;
+        this.unloadRecord(undefined, undefined, storeKey, newStatus);
+      }
+    }
+    return this ;
+  },
+  
   /**
     Destroys a record, removing the data hash from the store and adding the
     record to the destroyed changelog.  If you try to destroy a record that is 
@@ -1705,6 +1780,52 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     array.length = 0 ;
     return this;
   },
+
+  /** 
+    Convenience method can be called by the store or other parts of your 
+    application to load a record into the store.  This method will take a
+    recordType and a data hashes and either add or update the 
+    record in the store. 
+    
+    The loaded records will be in an SC.Record.READY_CLEAN state, indicating
+    they were loaded from the data source and do not need to be committed 
+    back before changing.
+    
+    This method will check the state of the storeKey and call either 
+    pushRetrieve() or dataSourceDidComplete().  The standard state constraints 
+    for these methods apply here.
+    
+    The return value will be the storeKey used for the push.  This is often
+    convenient to pass into loadQuery(), if you are fetching a remote query.
+    
+    If you are upgrading from a pre SproutCore 1.0 application, this method 
+    is the closest to the old updateRecord().
+    
+    @param {SC.Record} recordType the record type
+    @param {Array} dataHash to update
+    @param {Array} id optional.  if not passed lookup on the hash
+    @returns {String} store keys assigned to these id
+  */
+  loadRecord: function(recordType, dataHash, id) {
+    var K       = SC.Record,
+        ret, primaryKey, storeKey;
+        
+    // save lookup info
+    recordType = recordType || SC.Record;
+    primaryKey = recordType.prototype.primaryKey;
+    
+    
+    // push each record
+    id = id || dataHash[primaryKey];
+    ret = storeKey = recordType.storeKeyFor(id); // needed to cache
+      
+    if (this.readStatus(storeKey) & K.BUSY) {
+        this.dataSourceDidComplete(storeKey, dataHash, id);
+      } else this.pushRetrieve(recordType, id, dataHash, storeKey);
+    
+    // return storeKey
+    return ret ;
+  },
   
   /** 
     Convenience method can be called by the store or other parts of your 
@@ -1752,12 +1873,9 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
         primaryKey = recordType.prototype.primaryKey ;
       }
       id = (ids) ? ids.objectAt(idx) : dataHash[primaryKey];
-      ret[idx] = storeKey = recordType.storeKeyFor(id); // needed to cache
+      ret[idx] = this.loadRecord(recordType, dataHash, id);
       sc_precondition(typeof storeKey === SC.T_NUMBER);
       
-      if (this.readStatus(storeKey) & K.BUSY) {
-        this.dataSourceDidComplete(storeKey, dataHash, id);
-      } else this.pushRetrieve(recordType, id, dataHash, storeKey);
     }
     
     // return storeKeys
@@ -1950,7 +2068,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @param {Object} id the record id or null
     @param {Hash} dataHash data hash to load
     @param {Number} storeKey optional store key.  
-    @returns {Boolean} YES if push was allowed
+    @returns {Number|Boolean} storeKey if push was allowed, NO if not
   */
   pushRetrieve: function(recordType, id, dataHash, storeKey) {
     var K = SC.Record, status;
@@ -1966,7 +2084,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
 
       this.dataHashDidChange(storeKey);
       
-      return YES;
+      return storeKey;
     }
     //conflicted (ready)
     return NO;
@@ -1979,7 +2097,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @param {Class} recordType the SC.Record subclass
     @param {Object} id the record id or null
     @param {Number} storeKey optional store key.  
-    @returns {Boolean} YES if push was allowed
+    @returns {Number|Boolean} storeKey if push was allowed, NO if not
   */
   pushDestroy: function(recordType, id, storeKey) {
     var K = SC.Record, status;
@@ -1993,7 +2111,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
       status = K.DESTROYED_CLEAN;
       this.removeDataHash(storeKey, status) ;
       this.dataHashDidChange(storeKey);
-      return YES;
+      return storeKey;
     }
     //conflicted (destroy)
     return NO;
@@ -2007,7 +2125,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     @param {Object} id the record id or null
     @param {SC.Error} error [optional] an SC.Error instance to associate with id or storeKey
     @param {Number} storeKey optional store key.
-    @returns {Boolean} YES if push was allowed
+    @returns {Number|Boolean} storeKey if push was allowed, NO if not
   */
   pushError: function(recordType, id, error, storeKey) {
     var K = SC.Record, status, errors = this.recordErrors;
@@ -2027,7 +2145,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
       
       this.writeStatus(storeKey, status) ;
       this.dataHashDidChange(storeKey, null, YES);
-      return YES;
+      return storeKey;
     }
     //conflicted (error)
     return NO;
@@ -2076,9 +2194,9 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
     query.  This will put the query into a READY state if it was loading.
     
     Note that if the query is a REMOTE query, then you must separately load 
-    the results into the query using loadQuery().  If the query is LOCAL, then
-    the query will update automatically with any new records you added to the
-    store.
+    the results into the query using loadQueryResults().  If the query is 
+    LOCAL, then the query will update automatically with any new records you 
+    added to the store.
     
     @param {SC.Query} query the query you fetched
     @returns {SC.Store} receiver

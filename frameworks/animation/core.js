@@ -39,7 +39,6 @@ SC.Animatable = {
   */
   isAnimatable: YES,
   
-  
   transitions: {},
   concatenatedProperties: ["transitions"],
 
@@ -54,12 +53,13 @@ SC.Animatable = {
     "left": "left", "top": "top", 
     "right": "right", "bottom": "bottom",
     "width": "width", "height": "height",
-    "opacity": "opacity"
+    "opacity": "opacity",
+    "-webkit-transform": "-webkit-transform"
   },
 
   // properties that adjust should relay to style
-  _styleProperties: [ "opacity", "display" ],
-  _layoutStyles: ["left", "right", "top", "bottom", "width", "height", "centerX", "centerY"],
+  _styleProperties: [ "opacity", "display", "-webkit-transform" ],
+  _layoutStyles: 'width height top bottom marginLeft marginTop left right zIndex minWidth maxWidth minHeight maxHeight centerX centerY'.w(),
 
   // we cache this dictionary so we don't generate a new one each time we make
   // a new animation. It is used so we can start the animations in order—
@@ -67,14 +67,23 @@ SC.Animatable = {
   _animationsToStart: {},
 
   // and, said animation order
-  _animationOrder: ["top", "left", "bottom", "right", "width", "height", "centerX", "centerY", "opacity", "display"],
+  _animationOrder: ["top", "left", "bottom", "right", "width", "height", "centerX", "centerY", "opacity", "display", "-webkit-transform"],
 
 
   initMixin: function()
   {
+    this._animatable_original_didCreateLayer = this.didCreateLayer || function(){};
+    this.didCreateLayer = this._animatable_didCreateLayer;
+
     // substitute our didUpdateLayer method (but saving the old one)
     this._animatable_original_did_update_layer = this.didUpdateLayer || function(){};
     this.didUpdateLayer = this._animatable_did_update_layer;
+
+    this._animatable_original_willDestroyLayer = this.willDestroyLayer || function(){};
+    this.willDestroyLayer = this._animatable_willDestroyLayer;
+    
+    this._animatable_original_willRemoveFromParent = this.willRemoveFromParent || function(){};
+    this.willRemoveFromParent = this._animatable_will_remove_from_parent;
 
     // for debugging
     this._animateTickPixel.displayName = "animate-tick";
@@ -101,10 +110,44 @@ SC.Animatable = {
     }
 
     // live animators
+    this._animatableCurrentStyle = null;
     this._animators = {}; // keyAnimated => object describing it.
     this._animatableSetCSS = "";
     this._last_transition_css = ""; // to keep from re-setting unnecessarily
     this._disableAnimation = 0; // calls to disableAnimation add one; enableAnimation remove one.
+    this._transitionCallbacks = {}; // define callback set
+    
+    // alert if layer already created
+    if (!SC.none(this.get("layer"))) {
+      var o = this._animatable_original_didCreateLayer;
+      this._animatable_original_didCreateLayer = function(){};
+      this.didCreateLayer();
+      this._animatable_original_didCreateLayer = o;
+      
+      o = this._animatable_original_didUpdateLayer;
+      this._animatable_original_didUpdateLayer = function(){};
+      this.didUpdateLayer();
+      this._animatable_original_didUpdateLayer = o;
+    }
+  },
+
+  _animatable_didCreateLayer: function(){
+    SC.Event.add(this.get('layer'), "webkitTransitionEnd", this, this.transitionEnd);
+    SC.Event.add(this.get('layer'), "transitionend", this, this.transitionEnd);
+    return this._animatable_original_didCreateLayer();
+  },
+
+  _animatable_willDestroyLayer: function(){
+    SC.Event.remove(this.get('layer'), "webkitTransitionEnd", this, this.transitionEnd);
+    SC.Event.remove(this.get('layer'), "transitionend", this, this.transitionEnd);
+    return this._animatable_original_willDestroyLayer();
+  },
+  
+  /**
+  Stops all animations on the layer when this occurs by calling resetAnimation.
+  */
+  _animatable_will_remove_from_parent: function() {
+    this.resetAnimation();
   },
   
   /**
@@ -114,12 +157,17 @@ SC.Animatable = {
   If you call disable twice, you need two enables to start it. Three times, you need
   three enables.
   */
-  disableAnimation: function() { this._disableAnimation++; },
+  disableAnimation: function() { 
+    this._disableAnimation++;
+  },
   
   /**
   Enables animation if it was disabled (or moves towards that direction, at least).
   */
-  enableAnimation: function() { this._disableAnimation--; if (this._disableAnimation < 0) this._disableAnimation = 0; },
+  enableAnimation: function() {
+    this._disableAnimation--; 
+    if (this._disableAnimation < 0) this._disableAnimation = 0;
+  },
 
   /**
   Adds support for some style properties to adjust.
@@ -176,16 +224,50 @@ SC.Animatable = {
     return this;
   },
 
-  /**
-  Resets animation so that next manipulation of style will not animate.
 
-  Currently does not stop existing animations, so won't work very well
-  if there are any (will actually stutter).
+  transitionEnd: function(evt){
+    SC.RunLoop.begin();
+    var propertyName = evt.originalEvent.propertyName,
+        callback = this._transitionCallbacks[propertyName];
+
+    if(callback) SC.Animatable.runCallback(callback);
+    SC.RunLoop.end();
+  },
+
+
+  /**
+  Returns the current set of styles and layout according to JavaScript transitions.
+  
+  That is, for transitions managed by JavaScript (rather than CSS), the current position
+  (even mid-transition) will be returned. For CSS-based transitions, the target position
+  will be returned. This function is mostly useful for testing.
+  
+  It will return null if there is no such style.
   */
-  resetAnimation: function()
-  {
-    this._animatableCurrentStyle = this.style;
+  getCurrentJavaScriptStyles: function() {
+    return this._animatableCurrentStyle;
+  },
+
+  /**
+  Resets animation, stopping all existing animations.
+  */
+  resetAnimation: function() {
+    this._animatableCurrentStyle = null;
+    this._stopJavaScriptAnimations();
+    this.disableAnimation();
     this.updateStyle();
+    this.enableAnimation();
+  },
+  
+  /**
+    Stops all JavaScript animations on the object. In their tracks. Hah hah.
+  */
+  _stopJavaScriptAnimations: function() {
+    for (var i in this._animators) {
+      if (this._animators[i] && this._animators[i].isQueued) {
+         SC.Animatable.removeTimer(this._animators[i]);
+      }
+    }
   },
 
   _getStartStyleHash: function(start, target)
@@ -196,8 +278,8 @@ SC.Animatable = {
     this.layout = start;
 
     // get our frame and parent's frame
-    var f = this.get("frame");
-    var p = this.getPath("layoutView.frame");
+    var p = this.computeParentDimensions();
+    var f = this.computeFrameWithParentFrame(p);
 
     // set back to target
     this.layout = original_layout;
@@ -211,7 +293,7 @@ SC.Animatable = {
       if (f)
       {
         if (i == "left") { l[i] = f.x; continue; }
-        else if (i == " top") { l[i] = f.y; continue; }
+        else if (i == "top") { l[i] = f.y; continue; }
         else if (i == "right") { l[i] = p.width - f.x - f.width; continue; }
         else if (i == "bottom") { l[i] = p.height - f.y - f.height; continue; }
         else if (i == "width") { l[i] = f.width; continue; }
@@ -228,6 +310,23 @@ SC.Animatable = {
   },
 
   _TMP_CSS_TRANSITIONS: [],
+  
+  /**
+  @private
+  Returns a string with CSS for the timing portion of a transition.
+  */
+  cssTimingStringFor: function(transition) {
+    var timing_function = "linear";
+    if (transition.timing || SC.Animatable.defaultTimingFunction) {
+      var timing = transition.timing || SC.Animatable.defaultTimingFunction;
+      if (SC.typeOf(timing) != SC.T_STRING) {
+        timing_function = "cubic-bezier(" + timing[0] + ", " + timing[1] + ", " + timing[2] + ", " + timing[3] + ")";
+      } else {
+        timing_function = timing;
+      }
+    }
+    return timing_function;
+  },
   
   /**
   Immediately applies styles to elements, and starts any needed transitions.
@@ -248,7 +347,7 @@ SC.Animatable = {
     // make sure there _is_ a previous style to animate from. Otherwise,
     // we don't animate—and this is sometimes used to temporarily disable animation.
     var i;
-    if (!this._animatableCurrentStyle || this._disableAnimation > 0)
+    if (!this._animatableCurrentStyle || this._disableAnimation > 0 || !layer)
     {
       // clone it to be a nice starting point next time.
       this._animatableCurrentStyle = {};
@@ -283,33 +382,73 @@ SC.Animatable = {
 
     // prepare stuff for timing function calc
     var timing;
+    
+    // prepare special cases
+    var specialTransform = NO, specialTransformValue = "";
 
     // also prepare an array of CSS transitions to set up. Do this always so we get (and keep) all transitions.
     var cssTransitions = this._TMP_CSS_TRANSITIONS;
     if (SC.Animatable.enableCSSTransitions) {
+      // first, handle special cases
+      var timing_function;
+      
+      // this is a VERY special case. If right or bottom are supplied, can't do it. If left+top need
+      // animation at different speeds: can't do it.
+      if (
+        SC.Animatable.enableCSSTransforms &&
+        this.transitions["left"] && this.transitions["top"] && 
+        this.transitions["left"].duration == this.transitions["top"].duration &&
+        this.transitions["left"].timing == this.transitions["top"].timing &&
+        (!newStyle["right"] || newStyle["right"] == "") &&
+        (!newStyle["bottom"] || newStyle["bottom"] == "") 
+      ) {
+        specialTransform = YES;
+        timing_function = this.cssTimingStringFor(this.transitions["left"]);
+        cssTransitions.push("-webkit-transform " + this.transitions["left"].duration + "s " + timing_function);
+      }
+      
       // loop
       for (i in this.transitions) {
         if (!this._cssTransitionFor[i]) continue;
+        if (specialTransform && (i == "left" || i == "top")) continue;
 
         // get timing function
-        var timing_function = "linear";
-        if (this.transitions[i].timing || SC.Animatable.defaultTimingFunction) {
-          timing = this.transitions[i].timing || SC.Animatable.defaultTimingFunction;
-          if (SC.typeOf(timing) != SC.T_STRING) {
-            timing_function = "cubic-bezier(" + timing[0] + ", " + timing[1] + ", " + timing[2] + ", " + timing[3] + ")";
-          } else {
-            timing_function = timing;
-          }
-        }
-
-        // add transition
-        cssTransitions.push(this._cssTransitionFor[i] + " " + this.transitions[i].duration + "s " + timing_function);
-      }				
+        timing_function = this.cssTimingStringFor(this.transitions[i]);
+        
+        // sanitize name
+        cssTransitions.push(this._cssTransitionFor[i] + " " + this.transitions[i].duration + "s " + timing_function);		
+      }
     }
 
     for (i in newStyle)
     {
       if (i[0] == "_") continue; // guid (or something else we can't deal with anyway)
+      
+      // special case: Transform
+      if (specialTransform && (i == "left" || i == "top")) {
+        specialTransformValue += (i == "left" ? "translateX(" : "translateY(") + newStyle[i] + "px)";
+        startingPoint["-webkit-transform"] = specialTransformValue;
+        startingPoint["left"] = 0;
+        startingPoint["top"] = 0;
+        
+        if (this.transitions["left"].action){
+          this._transitionCallbacks["-webkit-transform"] = {
+            source: this,
+            target: (this.transitions["left"].target || this),
+            action: this.transitions["left"].action
+          };
+        }
+        
+        if (this.transitions["top"].action){
+          this._transitionCallbacks["-webkit-transform"] = {
+            source: this,
+            target: (this.transitions["right"].target || this),
+            action: this.transitions["right"].action
+          };
+        }
+        
+        continue;
+      }
 
       // if it needs to be set right away since it is not animatable, _getStartStyleHash
       // will have done that. But if we aren't supposed to animate it, we need to know, now.
@@ -337,6 +476,15 @@ SC.Animatable = {
         // the transition is already set up.
         // we can just set it as part of the starting point
         startingPoint[i] = newStyle[i];
+
+        if (this.transitions[i].action){
+          this._transitionCallbacks[i] = {
+            source: this,
+            target: (this.transitions[i].target || this),
+            action: this.transitions[i].action
+          };
+        }
+
         continue;
       }
 
@@ -385,6 +533,14 @@ SC.Animatable = {
       a.style = layer.style;
       a.holder = this;
 
+      if (this.transitions[i].action){
+        a.callback = {
+          source: this,
+          target: (this.transitions[i].target || this),
+          action: this.transitions[i].action
+        };
+      }
+
       timing = this.transitions[i].timing || SC.Animatable.defaultTimingFunction;
       if (timing && SC.typeOf(timing) != SC.T_STRING) a.timingFunction = timing;
 
@@ -430,7 +586,7 @@ SC.Animatable = {
   _animatableApplyStyles: function(layer, styles)
   {	
     if (!layer) return;
-
+    
     // handle a specific style first: display. There is a special case because it disrupts transitions.
     if (styles["display"]) {
       layer.style["display"] = styles["display"];
@@ -447,23 +603,21 @@ SC.Animatable = {
 
     // get timer
     var timer = this._animators["display-styles"];
-
-    // fire if there is already a pending one
-    if (timer.isQueued) {
-      //	timer.action.call(timer, 0);
-    }
-
+    
+    // set settings
     timer.holder = this;
     timer.action = this._animatableApplyNonDisplayStyles;
     timer.layer = layer;
     timer.styles = styles;
     this._animatableCurrentStyle = styles;
+    
+    // schedule.
     SC.Animatable.addTimer(timer);
   },
 
   _animatableApplyNonDisplayStyles: function(){
     var loop = SC.RunLoop.begin();
-    var layer = this.layer, styles = this.styles;
+    var layer = this.layer, styles = this.styles; // this == timer
     var styleHelpers = {
       opacity: this.holder._style_opacity_helper
       // more to be added here...
@@ -481,7 +635,8 @@ SC.Animatable = {
         updateLayout = YES;
         continue;
       }
-      if (styleHelpers[i]) styleHelpers[i](style, i, styles);
+      else if (styleHelpers[i]) styleHelpers[i](style, i, styles);
+      else style[i] = styles[i];
     }
 
     // don't want to set because we don't want updateLayout... again.
@@ -495,7 +650,7 @@ SC.Animatable = {
       // apply the styles (but we have to mix it in, because we still have transitions, etc. that we set)
       var ls = this.holder.get("layoutStyle");
       for (var key in ls) {
-        if (SC.none(ls[key])) delete style[key];
+        if (SC.none(ls[key])) style[key] = ""; // because IE is stupid and can't handle delete or null
         else if (style[key] != ls[key]) style[key] = ls[key];
       }
 
@@ -511,17 +666,20 @@ SC.Animatable = {
   _animatable_did_update_layer: function()
   {
     this._animatable_original_did_update_layer();
-    var styles = this._animatableCurrentStyle || (this.get("style") || {}), layer = this.get("layer");
+    var styles = this._animatableCurrentStyle, layer = this.get("layer");
+    if (!styles) {
+      styles = {};
+      var s = this.get("style");
+      var l = this.get("layout");
+      SC.mixin(styles, s, l);
+    }
     this._animatableApplyStyles(layer, styles);
   },
 
   /**
   Overriden to support animation.
 
-  Works by keeping a copy of the current layout, called animatableCurrentLayout.
-  Whenever the layout needs updating, the old layout is consulted.
-
-  "layout" is kept at the new layout
+  Works by copying the styles to the object's "style" property.
   */
   updateLayout: function(context, firstTime)
   {
@@ -533,7 +691,7 @@ SC.Animatable = {
       var key = ls[i];
       if (style[key] !== newLayout[key])
       {
-        if (SC.none(newLayout[key])) delete style[key];
+        if (SC.none(newLayout[key])) style[key] = undefined; // because IE is stupid and can't handle delete or debug.
         else style[key] = newLayout[key];
         didChange = YES;
       }
@@ -647,6 +805,7 @@ SC.Animatable = {
     if (t < e) SC.Animatable.addTimer(this);
     else {
       this.going = false;
+      if(this.callback) SC.Animatable.runCallback(this.callback);
       this.styles = null;
       this.layer = null;
     }
@@ -674,6 +833,7 @@ SC.Animatable = {
     this.style[this.property] = this.endValue;
 
     this.going = false;
+    if(this.callback) SC.Animatable.runCallback(this.callback);
     this.styles = null;
     this.layer = null;
   },
@@ -724,6 +884,7 @@ SC.Animatable = {
     if (t < e) SC.Animatable.addTimer(this);
     else {
       this.going = false;
+      if(this.callback) SC.Animatable.runCallback(this.callback);
       this.styles = null;
       this.layer = null;
     }
@@ -766,18 +927,19 @@ SC.Animatable = {
     var widthOrHeight, style;
     if (this.property == "centerX")
     {
-      widthOrHeight = "width"; style = "margin-left";
+      widthOrHeight = "width"; style = "marginLeft";
     }
     else
     {
-      widthOrHeight = "height"; style = "margin-top";
+      widthOrHeight = "height"; style = "marginTop";
     }
 
     this.style[style] = Math.round(value - (this.holder._animatableCurrentStyle[widthOrHeight] / 2)) + "px";
-
+    
     if (t < e) SC.Animatable.addTimer(this);
     else {
       this.going = false;
+      if(this.callback) SC.Animatable.runCallback(this.callback);
       this.styles = null;
       this.layer = null;
     }
@@ -796,7 +958,7 @@ SC.mixin(SC.Animatable, {
   TRANSITION_CSS_EASE: "ease",
   TRANSITION_CSS_EASE_IN: "ease-in",
   TRANSITION_CSS_EASE_OUT: "ease-out",
-  TRANSITION_CSS_EASE_OUT: "ease-in-out",
+  TRANSITION_CSS_EASE_IN_OUT: "ease-in-out",
 
   // JavaScript-enabled
   TRANSITION_EASE: [0.25, 0.1, 0.25, 1.0],
@@ -826,20 +988,30 @@ SC.mixin(SC.Animatable, {
   currentTime: new Date().getTime(),
 
   // global setting deciding whether CSS transitions should be enabled
-  enableCSSTransitions: false, // automatically calculated. You can override, but only from OUTSIDE.
+  enableCSSTransitions: NO, // automatically calculated. You can override, but only from OUTSIDE.
+  
+  enableCSSTransforms: NO, // automatically calculated (or, will be)
 
   // keep track of some basic statistics in an object (so they can be observable)
   stats: SC.Object.create({
     lastFPS: 0
   }),
 
-  addTimer: function(animator)
-  {
+  addTimer: function(animator) {
     if (animator.isQueued) return;
+    animator.prev = SC.Animatable.baseTimer;
     animator.next = SC.Animatable.baseTimer.next;
-    SC.Animatable.baseTimer.next = animator;
+    if (SC.Animatable.baseTimer.next) SC.Animatable.baseTimer.next.prev = animator; // adjust next prev.
+    SC.Animatable.baseTimer.next = animator; // switcheroo.
     animator.isQueued = true;
     if (!SC.Animatable.going) SC.Animatable.start();
+  },
+  
+  removeTimer: function(animator) {
+    if (!animator.isQueued) return;
+    if (animator.next) animator.next.prev = animator.prev; // splice ;)
+    animator.prev.next = animator.next; // it should always have a prev.
+    animator.isQueued = false;
   },
 
   start: function()
@@ -865,6 +1037,7 @@ SC.mixin(SC.Animatable, {
       var t = next.next;
       next.isQueued = false;
       next.next = null;
+      next.prev = null;
       next.action.call(next, start);
       next = t;
       i++;
@@ -893,7 +1066,38 @@ SC.mixin(SC.Animatable, {
       SC.Animatable.stats.set("lastFPS", SC.Animatable._ticks / (time_diff / 1000));
       loop.end();
     }
+  },
+
+  runCallback: function(callback){
+    var typeOfAction = SC.typeOf(callback.action);
+
+    // if the action is a function, just try to call it.
+    if (typeOfAction == SC.T_FUNCTION) {
+      callback.action.call(callback.target, callback.source);
+
+    // otherwise, action should be a string.  If it has a period, treat it
+    // like a property path.
+    } else if (typeOfAction === SC.T_STRING) {
+      if (callback.action.indexOf('.') >= 0) {
+        var path = callback.action.split('.') ;
+        var property = path.pop() ;
+
+        var target = SC.objectForPropertyPath(path, window) ;
+        var action = target.get ? target.get(property) : target[property];
+        if (action && SC.typeOf(action) == SC.T_FUNCTION) {
+          action.call(target, callback.source);
+        } else {
+          throw 'SC.Animator could not find a function at %@'.fmt(callback.action) ;
+        }
+
+      // otherwise, try to execute action direction on target or send down
+      // responder chain.
+      } else {
+        SC.RootResponder.responder.sendAction(callback.action, callback.target, callback.source);
+      }
+    }
   }
+
 });
 
 
@@ -901,34 +1105,38 @@ SC.mixin(SC.Animatable, {
 Test for CSS transition capability...
 */
 (function(){
-  var test = function(){ //return false;
-    // a test element
-    var el = document.createElement("div");
+  var allowsCSSTransforms = NO, allowsCSSTransitions = NO;
+  
+  // a test element
+  var el = document.createElement("div");
 
-    // the css and javascript to test
-    var css_browsers = ["-webkit"];
-    var test_browsers = ["moz", "Moz", "o", "ms", "webkit"];
+  // the css and javascript to test
+  var css_browsers = ["-webkit-", "-moz-", "-o-", "-ms-"];
+  var test_browsers = ["moz", "Moz", "o", "ms", "webkit"];
 
-    // prepare css
-    var css = "", i = null;
-    for (i = 0; i < css_browsers.length; i++) css += css_browsers[i] + "-transition:all 1s linear;"
+  // prepare css
+  var css = "", i = null;
+  for (i = 0; i < css_browsers.length; i++) {
+    css += css_browsers[i] + "transition:all 1s linear;"
+    css += css_browsers[i] + "transform: translate3d(1px, 1px, 1px)";
+  }
 
-    // set css text
-    el.style.cssText = css;
-
-    // test
-    for (i = 0; i < test_browsers.length; i++)
-    {
-      if (el.style[test_browsers[i] + "TransitionProperty"] !== undefined) return true;	
-    }
-
-    return false;
-  };
+  // set css text
+  el.style.cssText = css;
 
   // test
-  var testResult = test();
+  for (i = 0; i < test_browsers.length; i++)
+  {
+    if (el.style[test_browsers[i] + "TransitionProperty"] !== undefined) allowsCSSTransitions = YES;
+    if (el.style[test_browsers[i] + "Transform"] !== undefined) allowsCSSTransforms = YES;
+  }
+
+
+  // test
+  
   // console.error("Supports CSS transitions: " + testResult);
 
   // and apply what we found
-  if (testResult) SC.Animatable.enableCSSTransitions = true;
+  SC.Animatable.enableCSSTransitions = allowsCSSTransitions;
+  SC.Animatable.enableCSSTransforms = allowsCSSTransforms;
 })();

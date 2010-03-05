@@ -6,6 +6,7 @@
 // ==========================================================================
 
 sc_require('models/record');
+sc_require('models/child_record');
 
 /** @class
 
@@ -221,16 +222,16 @@ SC.RecordAttribute = SC.Object.extend(
       // cache.
       nvalue = this.fromType(record, key, value) ; // convert to attribute.
       record.writeAttribute(attrKey, nvalue); 
-    } else {
-      value = record.readAttribute(attrKey);
-      if (SC.none(value) && (value = this.get('defaultValue'))) {
-        if (typeof value === SC.T_FUNCTION) {
-          value = this.defaultValue(record, key, this);
-          // write default value so it doesn't have to be executed again
-          if(record.attributes()) record.writeAttribute(attrKey, value, true);
-        }
-      } else value = this.toType(record, key, value);
-    }
+    } 
+
+    value = record.readAttribute(attrKey);
+    if (SC.none(value) && (value = this.get('defaultValue'))) {
+       if (typeof value === SC.T_FUNCTION) {
+        value = this.defaultValue(record, key, this);
+        // write default value so it doesn't have to be executed again
+        if(record.attributes()) record.writeAttribute(attrKey, value, true);
+      }
+    } else value = this.toType(record, key, value);
     
     return value ;
   },
@@ -392,12 +393,13 @@ SC.RecordAttribute.registerTransform(Date, {
   /** @private - convert a string to a Date */
   to: function(str, attr) {
     var ret ;
+    str = str.toString() || '';
     
     if (attr.get('useIsoDate')) {
       var regexp = "([0-9]{4})(-([0-9]{2})(-([0-9]{2})" +
              "(T([0-9]{2}):([0-9]{2})(:([0-9]{2})(\\.([0-9]+))?)?" +
              "(Z|(([-+])([0-9]{2}):([0-9]{2})))?)?)?)?",
-          d      = str.toString().match(new RegExp(regexp)),
+          d      = str.match(new RegExp(regexp)),
           offset = 0,
           date   = new Date(d[1], 0, 1),
           time ;

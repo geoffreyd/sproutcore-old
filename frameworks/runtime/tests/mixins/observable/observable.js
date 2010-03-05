@@ -126,6 +126,12 @@ test("should return undefined if the provided object is undefined", function() {
   equals(SC.get(undefined, 'key'), undefined);
 });
 
+test("should work when object is SC (used in SC.objectForPropertyPath)", function() {
+  equals(SC.objectForPropertyPath('SC.RunLoop'), SC.RunLoop);
+  equals(SC.get('RunLoop'), SC.RunLoop);
+  equals(SC.get(SC, 'RunLoop'), SC.RunLoop);
+});
+
 // ..........................................................
 // SET()
 // 
@@ -474,6 +480,12 @@ test('incrementProperty and decrementProperty',function(){
   object.numberVal = 24;
   newValue = object.decrementProperty('numberVal');
   equals(23,newValue,'numerical value decremented');
+  object.numberVal = 25;
+  newValue = object.incrementProperty('numberVal', 5);
+  equals(30,newValue,'numerical value incremented by specified increment');
+  object.numberVal = 25;
+  newValue = object.decrementProperty('numberVal',5);
+  equals(20,newValue,'numerical value decremented by specified increment');
 });
 
 test('toggle function, should be boolean',function(){
