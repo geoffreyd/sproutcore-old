@@ -1874,7 +1874,7 @@ SC.Store = SC.Object.extend( /** @scope SC.Store.prototype */ {
       }
       id = (ids) ? ids.objectAt(idx) : dataHash[primaryKey];
       ret[idx] = this.loadRecord(recordType, dataHash, id);
-      sc_precondition(typeof storeKey === SC.T_NUMBER);
+      // sc_precondition(typeof storeKey === SC.T_NUMBER);
       
     }
     

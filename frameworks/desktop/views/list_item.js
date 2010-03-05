@@ -263,13 +263,12 @@ SC.ListItemView = SC.View.extend(
       classArray.push('has-branch');
     }
     
-    context.addClass(classArray);
-    // handle first and last
-    if (this.isFirst) context.addClass('first') ;
-    if (this.isLast) context.addClass('last') ;
     
-    // handle even-odd
-    if (this.contentIndex % 2) context.addClass('odd') ;
+    // handle first and last
+    if (this.isFirst) classArray.push('first') ;
+    if (this.isLast) classArray.push('last') ;
+    
+    context.addClass(classArray);
     context = working.end();
   },
   

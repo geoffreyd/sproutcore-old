@@ -780,7 +780,7 @@ SC.SplitView = SC.View.extend(
      sc_super();
      this.notifyPropertyChange('topLeftThickness')
          .notifyPropertyChange('bottomRightThickness');
-  }.observes('layout')
+  }.observes('layout'),
   
   init: function() {
     sc_super() ;
