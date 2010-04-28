@@ -193,7 +193,7 @@ SC.Record = SC.Object.extend(
   **/
   readOnlyAttributes: function() {
     var store    = this.get('store'), 
-        storeKey = this.storeKey;
+        storeKey = this.storeKey,
         ret      = store.readDataHash(storeKey);
     
     if (ret) ret = SC.clone(ret);
